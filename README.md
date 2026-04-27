@@ -129,12 +129,17 @@ These steps require a running Chorus development server and valid Chorus credent
 
 This package includes OpenCode skill prompts for the Chorus workflow. When the plugin loads, it auto-registers the bundled `skills/` directory with OpenCode's native skill discovery, so no manual symlinks or manual `skills.paths` entries are required for these bundled skills.
 
-- `skills/chorus/SKILL.md`: platform overview and lifecycle rules
-- `skills/idea/SKILL.md`: early idea capture and refinement
-- `skills/proposal/SKILL.md`: proposal, task, acceptance criteria, and dependency planning
-- `skills/develop/SKILL.md`: approved task implementation
-- `skills/quick-dev/SKILL.md`: small approved changes
-- `skills/review/SKILL.md`: automated reviewer comment and review-state flow
+Bundled skills are adapted from Chorus's plugin-embedded skill set and use OpenCode-compatible `SKILL.md` YAML frontmatter for metadata. OpenCode does not require per-skill `package.json` files for Agent Skills, so this package keeps metadata in the fields OpenCode documents: `name`, `description`, `license`, `compatibility`, and `metadata`.
+
+The stage-specific skills use a `chorus-` prefix so users can manage them with OpenCode skill permission patterns such as `chorus-*` without affecting unrelated workflow skills.
+
+- `skills/chorus/SKILL.md`: platform overview, shared tools, setup, lifecycle rules, and skill routing
+- `skills/chorus-idea/SKILL.md`: idea claiming, elaboration, requirements clarification, and owner confirmation
+- `skills/chorus-proposal/SKILL.md`: proposal planning, PRD and tech design drafts, task drafts, acceptance criteria, and dependency DAGs
+- `skills/chorus-develop/SKILL.md`: approved task implementation, work reporting, self-checks, subagent attribution, and verification submission
+- `skills/chorus-quick-dev/SKILL.md`: small approved changes, quick tasks, hotfixes, and optional admin self-verification
+- `skills/chorus-review/SKILL.md`: proposal approval/rejection, task verification, reviewer verdict handling, and governance
+- `skills/chorus-yolo/SKILL.md`: full-auto AI-DLC pipeline from prompt to completion with reviewer loops and wave-based execution
 
 Use the stage-specific skill that matches the current Chorus workflow stage.
 
