@@ -4,30 +4,100 @@ OpenCode plugin for Chorus.
 
 ## Installation
 
-Install dependencies with Bun:
+Install dependencies with Bun when using this repository directly:
 
 ```bash
 bun install
 ```
 
-Register the plugin from this package in your OpenCode configuration, then provide Chorus connection settings through the plugin config.
+Enable the plugin through OpenCode's normal plugin mechanisms. For local development, create a local wrapper plugin:
+
+```ts
+// ~/.config/opencode/plugins/chorus.ts
+import ChorusPlugin from "/absolute/path/to/opencode-chorus/index.ts"
+
+export const ChorusLocalPlugin = ChorusPlugin
+```
+
+When published as an npm package, the intended OpenCode config is:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["opencode-chorus"]
+}
+```
 
 ## Configuration
 
-The plugin accepts these configuration keys:
+Configure Chorus separately from OpenCode's `plugin` array. The plugin reads `chorus.json` from the OpenCode config directory and then applies environment variable overrides.
 
-- `chorusUrl`: Chorus server URL
-- `apiKey`: Chorus API key
-- `projectUuids`: optional parsed project UUID list reserved for routing or future project scoping
-- `stateDir`: optional override for the local `.chorus` state directory
-- reviewer toggles: optional settings for enabling or disabling automated proposal and task reviewer-shell comments
+Default config file path:
+
+```text
+~/.config/opencode/chorus.json
+```
+
+If `OPENCODE_CONFIG_DIR` is set, the plugin reads:
+
+```text
+$OPENCODE_CONFIG_DIR/chorus.json
+```
+
+If `XDG_CONFIG_HOME` is set and `OPENCODE_CONFIG_DIR` is not, the plugin reads:
+
+```text
+$XDG_CONFIG_HOME/opencode/chorus.json
+```
+
+Example `chorus.json`:
+
+```json
+{
+  "chorusUrl": "http://localhost:3000",
+  "enableProposalReviewer": true,
+  "enableTaskReviewer": true,
+  "maxProposalReviewRounds": 3,
+  "maxTaskReviewRounds": 3,
+  "stateDir": ".chorus",
+  "sharedStateMode": "compatible"
+}
+```
+
+Set the API key through the environment when possible:
+
+```bash
+export CHORUS_API_KEY="your-chorus-api-key"
+```
+
+The plugin also supports `apiKey` in `chorus.json`, but it logs a warning recommending `CHORUS_API_KEY` because API keys are secrets.
+
+Supported environment variables:
+
+- `CHORUS_BASE_URL`: Chorus server base URL, for example `http://localhost:3000`
+- `CHORUS_URL`: fallback alias for `CHORUS_BASE_URL`
+- `CHORUS_API_KEY`: Chorus API key
+- `CHORUS_PROJECT_UUIDS`: comma-separated project UUIDs
+- `CHORUS_STATE_DIR`: local state directory, default `.chorus`
+- `CHORUS_SHARED_STATE_MODE`: `compatible` or `isolated`
+- `CHORUS_AUTO_START`: `true`, `false`, `1`, or `0`
+- `CHORUS_ENABLE_PROPOSAL_REVIEWER`: `true`, `false`, `1`, or `0`
+- `CHORUS_ENABLE_TASK_REVIEWER`: `true`, `false`, `1`, or `0`
+- `CHORUS_MAX_PROPOSAL_REVIEW_ROUNDS`: positive integer
+- `CHORUS_MAX_TASK_REVIEW_ROUNDS`: positive integer
+
+Configuration precedence is:
+
+```text
+defaults < chorus.json < environment variables < explicit plugin options
+```
 
 ## Features
 
 - Chorus MCP tools in OpenCode
 - `.chorus` compatibility with isolated OpenCode state
 - proposal planning scope
-- automated proposal and task reviewer-shell comments with review-state persistence
+- automated proposal and task reviewer comments with review-state persistence
 - Chorus notification routing
 
 ## State Layout
@@ -63,6 +133,6 @@ This package includes OpenCode skill prompts for the Chorus workflow:
 - `skills/proposal/SKILL.md`: proposal, task, acceptance criteria, and dependency planning
 - `skills/develop/SKILL.md`: approved task implementation
 - `skills/quick-dev/SKILL.md`: small approved changes
-- `skills/review/SKILL.md`: automated reviewer-shell comment and review-state flow
+- `skills/review/SKILL.md`: automated reviewer comment and review-state flow
 
 Use the stage-specific skill that matches the current Chorus workflow stage.

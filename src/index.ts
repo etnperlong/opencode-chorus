@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { ChorusMcpClient } from "./chorus/mcp-client"
 import { createChorusTools } from "./chorus/tool-registry"
-import { resolveConfig } from "./config/schema"
+import { loadChorusConfig } from "./config/config-loader"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { markInterruptedReviews } from "./lifecycle/reviewer-lifecycle"
 import { extractSessionEventId, shouldReplaceMainSessionOnStartup, shouldStartMainSession } from "./lifecycle/session-events"
@@ -20,7 +20,8 @@ import { createLogger } from "./util/logger"
 
 export const createPlugin: Plugin = async (ctx, options) => {
   const logger = createLogger(ctx.client)
-  const config = resolveConfig(options ?? {})
+  const loadedConfig = await loadChorusConfig(options ?? {})
+  const config = loadedConfig.config
   const stateStore = new StateStore(ctx.directory, config.stateDir)
   await stateStore.init()
   const chorusClient = new ChorusMcpClient({
@@ -36,6 +37,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
     )
   })
 
+  if (loadedConfig.metadata.apiKeySource === "chorus.json") {
+    await logger.warn("Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.")
+  }
   await logger.info("Initializing opencode-chorus", {
     directory: ctx.directory,
     worktree: ctx.worktree,

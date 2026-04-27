@@ -1,10 +1,14 @@
-import { afterEach, describe, expect, it, mock } from "bun:test"
-import { mkdtemp, readFile, rm } from "node:fs/promises"
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
+const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
+let configDir = ""
+let previousConfigDir: string | undefined
+let previousChorusApiKey: string | undefined
 
 mock.module("../../src/chorus/mcp-client", () => ({
   ChorusMcpClient: class {
@@ -28,9 +32,23 @@ mock.module("../../src/notifications/sse-listener", () => ({
 const { createPlugin } = await import("../../src/index")
 
 describe("plugin hooks", () => {
-  afterEach(() => {
+  beforeEach(async () => {
+    configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+    previousConfigDir = process.env.OPENCODE_CONFIG_DIR
+    previousChorusApiKey = process.env.CHORUS_API_KEY
+    process.env.OPENCODE_CONFIG_DIR = configDir
+    delete process.env.CHORUS_API_KEY
+  })
+
+  afterEach(async () => {
     toolCalls.length = 0
     sessionCalls.length = 0
+    logCalls.length = 0
+    if (previousConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
+    else process.env.OPENCODE_CONFIG_DIR = previousConfigDir
+    if (previousChorusApiKey === undefined) delete process.env.CHORUS_API_KEY
+    else process.env.CHORUS_API_KEY = previousChorusApiKey
+    await rm(configDir, { recursive: true, force: true })
   })
 
   it("does not check in or start the main Chorus session when autoStart is false", async () => {
@@ -209,6 +227,28 @@ describe("plugin hooks", () => {
       await rm(rootDir, { recursive: true, force: true })
     }
   })
+
+  it("warns when apiKey is loaded from chorus.json", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      await writeFile(
+        join(configDir, "chorus.json"),
+        JSON.stringify({ chorusUrl: "http://localhost:8637", apiKey: "file-key" }),
+      )
+
+      await createPlugin(createContext(rootDir), {})
+
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "warn",
+          message: "Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.",
+        }),
+      )
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
 })
 
 function createContext(directory: string) {
@@ -217,7 +257,13 @@ function createContext(directory: string) {
     worktree: directory,
     client: {
       app: {
-        log: async () => {},
+        log: async (input?: { body?: { level?: string; message?: string; extra?: Record<string, unknown> } }) => {
+          logCalls.push({
+            level: input?.body?.level ?? "",
+            message: input?.body?.message,
+            extra: input?.body?.extra,
+          })
+        },
       },
       session: {
         create: async (args: Record<string, unknown>) => {
