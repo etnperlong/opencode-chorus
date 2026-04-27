@@ -189,7 +189,25 @@ describe("config loader", () => {
     try {
       await writeFile(configPath, "{")
 
-      await expect(loadChorusConfig({}, { OPENCODE_CONFIG_DIR: configDir })).rejects.toThrow(configPath)
+      await expect(loadChorusConfig({}, { OPENCODE_CONFIG_DIR: configDir })).rejects.toMatchObject({
+        name: "InvalidChorusConfigError",
+        configPath,
+        message: expect.stringContaining(configPath),
+      })
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("throws a structured missing-config error for absent required values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      await expect(loadChorusConfig({}, { OPENCODE_CONFIG_DIR: configDir })).rejects.toMatchObject({
+        name: "MissingRequiredConfigError",
+        configKey: "chorusUrl",
+        message: "Missing required config: chorusUrl",
+      })
     } finally {
       await rm(configDir, { recursive: true, force: true })
     }

@@ -1,4 +1,5 @@
 ---
+name: review
 description: Chorus review workflow for OpenCode. Use when preparing for, tracking, or responding to automated proposal and task reviewer comments.
 version: 0.7.5
 ---

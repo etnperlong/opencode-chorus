@@ -12,6 +12,16 @@ export type ChorusConfigLoadResult = {
   }
 }
 
+export class InvalidChorusConfigError extends Error {
+  readonly configPath: string
+
+  constructor(configPath: string, cause: unknown) {
+    super(`Failed to parse Chorus config at ${configPath}: ${formatErrorMessage(cause)}`)
+    this.name = "InvalidChorusConfigError"
+    this.configPath = configPath
+  }
+}
+
 type PartialConfig = Record<string, unknown>
 
 const CHORUS_CONFIG_FILE = "chorus.json"
@@ -63,7 +73,7 @@ async function readChorusConfigFile(filePath: string): Promise<PartialConfig> {
     const parsed = JSON.parse(raw)
     return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}
   } catch (error) {
-    throw new Error(`Failed to parse Chorus config at ${filePath}: ${formatErrorMessage(error)}`)
+    throw new InvalidChorusConfigError(filePath, error)
   }
 }
 

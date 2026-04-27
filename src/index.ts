@@ -2,6 +2,8 @@ import type { Plugin } from "@opencode-ai/plugin"
 import { ChorusMcpClient } from "./chorus/mcp-client"
 import { createChorusTools } from "./chorus/tool-registry"
 import { loadChorusConfig } from "./config/config-loader"
+import { applyPluginConfig } from "./config/plugin-config"
+import { MissingRequiredConfigError } from "./config/schema"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { markInterruptedReviews } from "./lifecycle/reviewer-lifecycle"
 import { extractSessionEventId, shouldReplaceMainSessionOnStartup, shouldStartMainSession } from "./lifecycle/session-events"
@@ -13,14 +15,23 @@ import { ChorusSseListener, type SseNotificationEvent } from "./notifications/ss
 import { resolvePlanningSessionId } from "./planning/planning-rules"
 import { parseVerdict } from "./reviewers/review-parser"
 import { dispatchProposalReviewer, dispatchTaskReviewer } from "./reviewers/reviewer-dispatcher"
-import { applyReviewerAgentConfig } from "./reviewers/reviewer-agents"
 import { beginReviewRound, persistReviewJobId, persistReviewVerdict } from "./reviewers/review-sync"
 import { StateStore } from "./state/state-store"
 import { createLogger } from "./util/logger"
 
 export const createPlugin: Plugin = async (ctx, options) => {
   const logger = createLogger(ctx.client)
-  const loadedConfig = await loadChorusConfig(options ?? {})
+  let loadedConfig
+  try {
+    loadedConfig = await loadChorusConfig(options ?? {})
+  } catch (error) {
+    if (isMissingRequiredConfigError(error)) {
+      return {
+        config: applyPluginConfig,
+      }
+    }
+    throw error
+  }
   const config = loadedConfig.config
   const stateStore = new StateStore(ctx.directory, config.stateDir)
   await stateStore.init()
@@ -50,7 +61,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     .catch((error) => logger.warn("Chorus notification listener stopped", { error: formatError(error) }))
 
   return {
-    config: applyReviewerAgentConfig,
+    config: applyPluginConfig,
     tool: createChorusTools(chorusClient),
     event: async ({ event }) => {
       await logger.debug("Observed OpenCode event", { type: event.type })
@@ -229,4 +240,8 @@ function isChorusNotification(value: unknown): value is ChorusNotification {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function isMissingRequiredConfigError(error: unknown): boolean {
+  return error instanceof MissingRequiredConfigError
 }

@@ -1,4 +1,5 @@
 ---
+name: develop
 description: Chorus development workflow for OpenCode. Use when implementing approved Chorus tasks with tracked scope and review readiness.
 version: 0.7.5
 ---

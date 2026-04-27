@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
+const chorusSkillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 let configDir = ""
 let previousConfigDir: string | undefined
 let previousChorusApiKey: string | undefined
@@ -207,6 +209,10 @@ describe("plugin hooks", () => {
 
       await plugin.config?.(config as never)
 
+      expect(config.skills).toEqual({
+        paths: [chorusSkillsDir],
+      })
+
       const agents = config.agent as Record<string, Record<string, unknown>>
       const proposalReviewer = agents["proposal-reviewer"]
       const taskReviewer = agents["task-reviewer"]
@@ -223,6 +229,120 @@ describe("plugin hooks", () => {
         maxSteps: 25,
       })
       expect(taskReviewer?.prompt).toContain("targeted re-verification")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("registers bundled Chorus skills when runtime Chorus config is missing", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {})
+      const config: Record<string, unknown> = {}
+
+      await plugin.config?.(config as never)
+
+      expect(config.skills).toEqual({
+        paths: [chorusSkillsDir],
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("rethrows non-missing config load failures", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+    const configPath = join(configDir, "chorus.json")
+
+    try {
+      await writeFile(configPath, "{")
+
+      await expect(createPlugin(createContext(rootDir), {})).rejects.toMatchObject({
+        name: "InvalidChorusConfigError",
+        configPath,
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("returns runtime hooks when valid Chorus config is present", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      expect(plugin.config).toBeFunction()
+      expect(plugin.event).toBeFunction()
+      expect(plugin.tool).toBeDefined()
+      expect(plugin["tool.execute.after"]).toBeFunction()
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("registers bundled Chorus skills without overwriting existing skill paths", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const config: Record<string, unknown> = {
+        skills: { paths: ["/tmp/custom-skills"] },
+      }
+
+      await plugin.config?.(config as never)
+
+      expect(config.skills).toEqual({
+        paths: ["/tmp/custom-skills", chorusSkillsDir],
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not duplicate the bundled Chorus skills path", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const config: Record<string, unknown> = {
+        skills: { paths: [chorusSkillsDir] },
+      }
+
+      await plugin.config?.(config as never)
+
+      const paths = (config.skills as { paths: string[] }).paths
+      expect(paths.filter((entry) => entry === chorusSkillsDir)).toHaveLength(1)
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not duplicate the bundled Chorus skills path when an existing entry omits the trailing separator", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const config: Record<string, unknown> = {
+        skills: { paths: [chorusSkillsDir.replace(/\/$/, "")] },
+      }
+
+      await plugin.config?.(config as never)
+
+      expect((config.skills as { paths: string[] }).paths).toEqual([chorusSkillsDir.replace(/\/$/, "")])
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

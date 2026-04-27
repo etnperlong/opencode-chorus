@@ -1,4 +1,5 @@
 ---
+name: chorus
 description: Chorus AI collaboration workflow for OpenCode. Use for platform overview, shared tools, lifecycle rules, and routing to stage-specific skills.
 version: 0.7.5
 ---

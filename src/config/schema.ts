@@ -23,12 +23,22 @@ export type OpenCodeChorusConfig = {
   sharedStateMode: SharedStateMode
 }
 
+export class MissingRequiredConfigError extends Error {
+  readonly configKey: keyof Pick<OpenCodeChorusConfig, "chorusUrl" | "apiKey">
+
+  constructor(configKey: keyof Pick<OpenCodeChorusConfig, "chorusUrl" | "apiKey">) {
+    super(`Missing required config: ${configKey}`)
+    this.name = "MissingRequiredConfigError"
+    this.configKey = configKey
+  }
+}
+
 export function resolveConfig(input: Record<string, unknown>): OpenCodeChorusConfig {
   const chorusUrl = String(input.chorusUrl ?? "").trim()
   const apiKey = String(input.apiKey ?? "").trim()
 
-  if (!chorusUrl) throw new Error("Missing required config: chorusUrl")
-  if (!apiKey) throw new Error("Missing required config: apiKey")
+  if (!chorusUrl) throw new MissingRequiredConfigError("chorusUrl")
+  if (!apiKey) throw new MissingRequiredConfigError("apiKey")
 
   return {
     chorusUrl,

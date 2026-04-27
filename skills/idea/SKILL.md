@@ -1,4 +1,5 @@
 ---
+name: idea
 description: Chorus idea workflow for OpenCode. Use when exploring, capturing, or refining early project ideas before proposal planning.
 version: 0.7.5
 ---

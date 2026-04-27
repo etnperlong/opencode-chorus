@@ -1,4 +1,5 @@
 ---
+name: proposal
 description: Chorus proposal workflow for OpenCode. Use when creating proposals, document drafts, task drafts, acceptance criteria, and dependency DAGs.
 version: 0.7.5
 ---

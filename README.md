@@ -126,7 +126,7 @@ These steps require a running Chorus development server and valid Chorus credent
 
 ## Skills
 
-This package includes OpenCode skill prompts for the Chorus workflow:
+This package includes OpenCode skill prompts for the Chorus workflow. When the plugin loads, it auto-registers the bundled `skills/` directory with OpenCode's native skill discovery, so no manual symlinks or manual `skills.paths` entries are required for these bundled skills.
 
 - `skills/chorus/SKILL.md`: platform overview and lifecycle rules
 - `skills/idea/SKILL.md`: early idea capture and refinement
@@ -136,3 +136,9 @@ This package includes OpenCode skill prompts for the Chorus workflow:
 - `skills/review/SKILL.md`: automated reviewer comment and review-state flow
 
 Use the stage-specific skill that matches the current Chorus workflow stage.
+
+If the Chorus skills do not appear in `/skills`:
+
+1. Confirm the plugin is enabled and loaded by OpenCode.
+2. Restart OpenCode after enabling or updating the plugin.
+3. Confirm the bundled `SKILL.md` files still contain valid `name` and `description` frontmatter.
