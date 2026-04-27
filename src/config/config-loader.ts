@@ -89,6 +89,8 @@ function parseEnvConfig(env: ChorusConfigEnv): PartialConfig {
     enableTaskReviewer: parseBoolean(env.CHORUS_ENABLE_TASK_REVIEWER),
     maxProposalReviewRounds: parsePositiveInteger(env.CHORUS_MAX_PROPOSAL_REVIEW_ROUNDS),
     maxTaskReviewRounds: parsePositiveInteger(env.CHORUS_MAX_TASK_REVIEW_ROUNDS),
+    reviewerWaitTimeoutMs: parsePositiveInteger(env.CHORUS_REVIEWER_WAIT_TIMEOUT_MS),
+    reviewerPollIntervalMs: parsePositiveInteger(env.CHORUS_REVIEWER_POLL_INTERVAL_MS),
   })
 }
 

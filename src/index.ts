@@ -15,6 +15,7 @@ import { resolvePlanningSessionId } from "./planning/planning-rules"
 import { parseVerdict } from "./reviewers/review-parser"
 import { PROPOSAL_REVIEWER_AGENT, TASK_REVIEWER_AGENT } from "./reviewers/reviewer-agents"
 import { dispatchProposalReviewer, dispatchTaskReviewer } from "./reviewers/reviewer-dispatcher"
+import { waitForReviewerVerdict, type ReviewerWaitResult } from "./reviewers/reviewer-waiter"
 import { beginReviewRound, persistReviewJobId, persistReviewVerdict } from "./reviewers/review-sync"
 import { StateStore } from "./state/state-store"
 import { createLogger } from "./util/logger"
@@ -120,7 +121,20 @@ export const createPlugin: Plugin = async (ctx, options) => {
           return
         }
 
-        await persistReviewVerdict(stateStore, `${targetType}:${targetUuid}`, verdict)
+        const targetKey = `${targetType}:${targetUuid}`
+        const state = await stateStore.readOpenCodeState()
+        const existing = state.reviews[targetKey]
+        if (existing?.lastReviewJobId && input.sessionID !== existing.lastReviewJobId) return
+        if (existing?.status === "reviewing" && !existing.lastReviewJobId) {
+          return
+        }
+
+        await persistReviewVerdict(
+          stateStore,
+          targetKey,
+          verdict,
+          existing?.lastReviewJobId ? { expectedReviewJobId: input.sessionID } : {},
+        )
       }
 
       if (tool === "chorus_pm_submit_proposal" && config.enableProposalReviewer) {
@@ -138,9 +152,25 @@ export const createPlugin: Plugin = async (ctx, options) => {
           round: review.currentRound,
           maxRounds: review.maxRounds,
           parentSessionID: input.sessionID,
+          onSessionCreated: async (sessionId) => {
+            const persisted = await persistReviewJobId(stateStore, targetKey, sessionId, {
+              expectedRound: review.currentRound,
+            })
+            if (!persisted) throw new Error("Review round changed before reviewer prompt started")
+          },
         })
         attachReviewerMetadata(output, "Chorus proposal review", PROPOSAL_REVIEWER_AGENT, reviewJobId)
-        await persistReviewJobId(stateStore, targetKey, reviewJobId)
+        const waitResult = await waitForReviewerVerdict({
+          stateStore,
+          client: chorusClient,
+          targetType: "proposal",
+          targetUuid: proposalUuid,
+          targetKey,
+          timeoutMs: config.reviewerWaitTimeoutMs,
+          pollIntervalMs: config.reviewerPollIntervalMs,
+          reviewJobId,
+        })
+        attachReviewerGateResult(output, waitResult, reviewJobId)
       }
 
       if (tool === "chorus_submit_for_verify" && config.enableTaskReviewer) {
@@ -157,9 +187,25 @@ export const createPlugin: Plugin = async (ctx, options) => {
           round: review.currentRound,
           maxRounds: review.maxRounds,
           parentSessionID: input.sessionID,
+          onSessionCreated: async (sessionId) => {
+            const persisted = await persistReviewJobId(stateStore, targetKey, sessionId, {
+              expectedRound: review.currentRound,
+            })
+            if (!persisted) throw new Error("Review round changed before reviewer prompt started")
+          },
         })
         attachReviewerMetadata(output, "Chorus task review", TASK_REVIEWER_AGENT, reviewJobId)
-        await persistReviewJobId(stateStore, targetKey, reviewJobId)
+        const waitResult = await waitForReviewerVerdict({
+          stateStore,
+          client: chorusClient,
+          targetType: "task",
+          targetUuid: taskUuid,
+          targetKey,
+          timeoutMs: config.reviewerWaitTimeoutMs,
+          pollIntervalMs: config.reviewerPollIntervalMs,
+          reviewJobId,
+        })
+        attachReviewerGateResult(output, waitResult, reviewJobId)
       }
     },
   }
@@ -232,6 +278,33 @@ function attachReviewerMetadata(
     taskId: sessionId,
     agent,
   }
+}
+
+function attachReviewerGateResult(
+  output: { output: string; metadata: unknown },
+  waitResult: ReviewerWaitResult,
+  reviewJobId: string,
+): void {
+  output.metadata = {
+    ...(isRecord(output.metadata) ? output.metadata : {}),
+    reviewStatus: waitResult.status,
+    ...(waitResult.status === "completed" ? { verdict: waitResult.verdict } : {}),
+  }
+
+  const reviewer = {
+    sessionId: reviewJobId,
+    status: waitResult.status,
+    ...(waitResult.status === "completed"
+      ? { verdict: waitResult.verdict }
+      : { message: "Reviewer did not finish before timeout" }),
+  }
+  const parsedOutput = parseJsonObject(output.output)
+  if (parsedOutput) {
+    output.output = JSON.stringify({ ...parsedOutput, reviewer }, null, 2)
+    return
+  }
+
+  output.output = `${output.output}\nReviewer result: ${JSON.stringify(reviewer)}`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -293,7 +293,7 @@ If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode res
 
 ### 5. Review Agent Configuration
 
-The plugin includes two independent review agents. After proposal submission or task verification, a PostToolUse hook injects context instructing the main agent to spawn the reviewer. The main agent must spawn it manually — it is NOT auto-launched. Both are **enabled by default**.
+The plugin includes two independent review agents. After proposal submission or task verification, the plugin auto-launches the appropriate reviewer as an OpenCode child sub-agent and waits for a current reviewer VERDICT, up to the configured timeout. Both are **enabled by default**.
 
 | Setting | Controls | Default |
 |---------|----------|---------|
@@ -309,7 +309,7 @@ To disable, set the reviewer options in `chorus.json` in the OpenCode config dir
 }
 ```
 
-When enabled, reviewers run as read-only sub-agents and post a VERDICT comment on the proposal/task. Three possible outcomes: **PASS** (no issues), **PASS WITH NOTES** (minor non-blocking notes), or **FAIL** (BLOCKERs found). Results are advisory — they do not block approval or verification. Disabling reduces token usage but removes the independent quality gate.
+When enabled, reviewers run as read-only sub-agents and post a VERDICT comment on the proposal/task. Three possible outcomes: **PASS** (no issues), **PASS WITH NOTES** (minor non-blocking notes), or **FAIL** (BLOCKERs found). The triggering tool call waits for this quality gate to complete or timeout before the main workflow continues. Disabling reduces token usage but removes the independent quality gate.
 
 ---
 

@@ -85,6 +85,8 @@ Supported environment variables:
 - `CHORUS_ENABLE_TASK_REVIEWER`: `true`, `false`, `1`, or `0`
 - `CHORUS_MAX_PROPOSAL_REVIEW_ROUNDS`: positive integer
 - `CHORUS_MAX_TASK_REVIEW_ROUNDS`: positive integer
+- `CHORUS_REVIEWER_WAIT_TIMEOUT_MS`: max milliseconds to wait for automatic reviewer verdicts, default `300000`
+- `CHORUS_REVIEWER_POLL_INTERVAL_MS`: milliseconds between reviewer verdict polls, default `1000`
 
 Configuration precedence is:
 
@@ -98,6 +100,7 @@ defaults < chorus.json < environment variables < explicit plugin options
 - `.chorus` compatibility with isolated OpenCode state
 - proposal planning scope
 - automated proposal and task reviewer comments with review-state persistence
+- strict proposal/task reviewer gating that waits for a verdict before the triggering workflow continues
 - Chorus notification routing
 
 ## State Layout

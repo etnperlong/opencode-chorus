@@ -27,10 +27,16 @@ export async function persistReviewVerdict(
   stateStore: StateStore,
   targetKey: string,
   verdict: ReviewVerdict,
-) {
-  return stateStore.updateOpenCodeState((state) => {
+  options: { expectedReviewJobId?: string } = {},
+): Promise<boolean> {
+  let persisted = false
+
+  await stateStore.updateOpenCodeState((state) => {
     const existing = state.reviews[targetKey]
     if (existing?.status === "escalated") return state
+    if (options.expectedReviewJobId && existing?.lastReviewJobId !== options.expectedReviewJobId) return state
+
+    persisted = true
 
     return {
       ...state,
@@ -47,12 +53,25 @@ export async function persistReviewVerdict(
       },
     }
   })
+
+  return persisted
 }
 
-export async function persistReviewJobId(stateStore: StateStore, targetKey: string, jobId: string): Promise<void> {
+export async function persistReviewJobId(
+  stateStore: StateStore,
+  targetKey: string,
+  jobId: string,
+  options: { expectedRound?: number } = {},
+): Promise<boolean> {
+  let persisted = false
+
   await stateStore.updateOpenCodeState((state) => {
     const existing = state.reviews[targetKey]
     if (!existing) return state
+    if (options.expectedRound !== undefined && existing.currentRound !== options.expectedRound) return state
+    if (options.expectedRound !== undefined && existing.status !== "reviewing") return state
+
+    persisted = true
 
     return {
       ...state,
@@ -65,4 +84,6 @@ export async function persistReviewJobId(stateStore: StateStore, targetKey: stri
       },
     }
   })
+
+  return persisted
 }

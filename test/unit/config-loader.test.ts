@@ -115,6 +115,67 @@ describe("config loader", () => {
     }
   })
 
+  it("uses default reviewer gate runtime config values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {
+          chorusUrl: "http://localhost:8637",
+          apiKey: "test-key",
+        },
+        { OPENCODE_CONFIG_DIR: configDir },
+      )
+
+      expect(config.reviewerWaitTimeoutMs).toBe(300_000)
+      expect(config.reviewerPollIntervalMs).toBe(1_000)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("lets explicit plugin options set reviewer gate runtime config values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {
+          chorusUrl: "http://localhost:8637",
+          apiKey: "test-key",
+          reviewerWaitTimeoutMs: 25,
+          reviewerPollIntervalMs: 5,
+        },
+        { OPENCODE_CONFIG_DIR: configDir },
+      )
+
+      expect(config.reviewerWaitTimeoutMs).toBe(25)
+      expect(config.reviewerPollIntervalMs).toBe(5)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("falls back to default reviewer gate runtime config values for invalid explicit options", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {
+          chorusUrl: "http://localhost:8637",
+          apiKey: "test-key",
+          reviewerWaitTimeoutMs: 1.5,
+          reviewerPollIntervalMs: Number.POSITIVE_INFINITY,
+        },
+        { OPENCODE_CONFIG_DIR: configDir },
+      )
+
+      expect(config.reviewerWaitTimeoutMs).toBe(300_000)
+      expect(config.reviewerPollIntervalMs).toBe(1_000)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
   it("uses CHORUS_URL when CHORUS_BASE_URL is absent", async () => {
     const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
 
@@ -177,6 +238,28 @@ describe("config loader", () => {
       expect(result.config.enableTaskReviewer).toBe(true)
       expect(result.config.maxProposalReviewRounds).toBe(5)
       expect(result.config.maxTaskReviewRounds).toBe(6)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("parses reviewer gate runtime config environment values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {},
+        {
+          OPENCODE_CONFIG_DIR: configDir,
+          CHORUS_BASE_URL: "http://localhost:8637",
+          CHORUS_API_KEY: "test-key",
+          CHORUS_REVIEWER_WAIT_TIMEOUT_MS: "25",
+          CHORUS_REVIEWER_POLL_INTERVAL_MS: "5",
+        },
+      )
+
+      expect(config.reviewerWaitTimeoutMs).toBe(25)
+      expect(config.reviewerPollIntervalMs).toBe(5)
     } finally {
       await rm(configDir, { recursive: true, force: true })
     }

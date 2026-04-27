@@ -249,13 +249,13 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    ```
    chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
    ```
-   After this call, the PostToolUse hook injects context instructing you to spawn `chorus:proposal-reviewer`. You MUST spawn it yourself in foreground and wait for it — it is NOT auto-launched.
+   After this call, the plugin auto-launches `proposal-reviewer` as a child sub-agent and waits for its current VERDICT or timeout before returning the tool result.
 
 ---
 
 ### Phase 2: Proposal Review Loop
 
-After `chorus_pm_submit_proposal`, the PostToolUse hook injects context instructing you to spawn `chorus:proposal-reviewer`. You MUST manually spawn it as a read-only sub-agent in foreground. Wait for it to complete, then:
+After `chorus_pm_submit_proposal`, the plugin auto-launches `proposal-reviewer` as a read-only child sub-agent and gates the tool result on the current reviewer VERDICT or timeout. When the tool returns:
 
 1. **Read the reviewer's VERDICT:**
    ```
@@ -286,14 +286,14 @@ After `chorus_pm_submit_proposal`, the PostToolUse hook injects context instruct
      ```
      chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
      ```
-     After resubmission, the hook injects context again — spawn the reviewer yourself for Round 2.
+      After resubmission, the plugin auto-launches and waits for the Round 2 reviewer gate.
 
 3. **Max rounds:** Loop up to `maxProposalReviewRounds` (from plugin config, default 3). If exhausted:
    ```
    STOP: "Proposal review failed after {maxRounds} rounds. Remaining BLOCKERs: <list>. Human review needed. Proposal UUID: <uuid>"
    ```
 
-4. **No new VERDICT comment after reviewer returns?** The reviewer exhausted its step budget. Respawn it ONCE with a concise-budget hint: *"Stay within step budget. Skip deep source verification. Fetch proposal + comments + idea only, skim for obvious BLOCKERs, and post your VERDICT within the first 10 steps."* If the second attempt still produces no VERDICT, treat the proposal as PASS WITH NOTES and proceed — the pipeline cannot loop forever on a silent reviewer.
+4. **Reviewer timeout or no current VERDICT?** The plugin reports the reviewer session id in the tool result. Inspect that child session and Chorus comments. If the reviewer exhausted its step budget, resolve manually: either rerun/resubmit for another reviewer gate, treat as PASS WITH NOTES only with explicit judgment, or stop for human review. Do not silently continue on a missing quality-gate verdict.
 
 ---
 
@@ -330,7 +330,7 @@ loop:
   # 4. Wait for all sub-agents to complete
   #    Each sub-agent follows the chorus-develop workflow:
   #    claim -> in_progress -> develop -> report -> self-check AC -> submit_for_verify
-  #    PostToolUse hook injects context — main agent must spawn task-reviewer after submit_for_verify
+  #    submit_for_verify auto-launches task-reviewer and gates on its current VERDICT or timeout
 
   # 5. Proceed to Phase 4 (verification) for this wave
   wave += 1
@@ -357,11 +357,11 @@ for each task in unblocked:
   chorus_report_criteria_self_check({ taskUuid: "<task-uuid>", criteria: [...] })
   chorus_submit_for_verify({ taskUuid: "<task-uuid>", summary: "..." })
 
-  # PostToolUse hook injects context — you must spawn task-reviewer yourself
+  # submit_for_verify auto-launches task-reviewer and gates on its current VERDICT or timeout
   # Proceed to Phase 4 verification for this task before moving to next
 ```
 
-The fallback is slower (sequential, not parallel) but still completes the pipeline. The PostToolUse hook injects reviewer instructions the same way in both modes — you must always spawn the reviewer manually.
+The fallback is slower (sequential, not parallel) but still completes the pipeline. Reviewer gating works the same way in both modes — the plugin auto-launches and waits for the reviewer after verification submission.
 
 ---
 
@@ -378,15 +378,11 @@ for each task in wave_tasks:
     # Sub-agent may have failed; skip or handle
     continue
 
-  # 2. Spawn task-reviewer in FOREGROUND (hook injects context — you must spawn it yourself)
-  #    Run it in foreground — you need the VERDICT before proceeding
-  task({ subagent_type: "chorus:task-reviewer", prompt: "Review task <task-uuid>..." })
-
-  # 3. Read task-reviewer VERDICT
+  # 2. Read task-reviewer VERDICT from the gated submit_for_verify result or comments
   comments = chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
   # Find the most recent comment containing "VERDICT:"
 
-  # 4. Act on VERDICT — three possible outcomes:
+  # 3. Act on VERDICT — three possible outcomes:
   if VERDICT is "PASS":
     # All AC verified, no issues. Mark AC and verify.
     chorus_mark_acceptance_criteria({
@@ -420,7 +416,7 @@ ESCALATE: "Task '{title}' failed review after {maxRounds} rounds. Last BLOCKERs:
 
 Continue with remaining tasks -- do not halt the entire pipeline for one stuck task.
 
-**No new VERDICT comment after the task-reviewer returns?** It exhausted its step budget. Respawn it ONCE with a concise-budget hint: *"Stay within step budget. Skip deep verification. Fetch task, proposal, and comments; run only the core tests, and post your VERDICT within the first 12 steps."* If the second attempt also produces no VERDICT, treat as PASS WITH NOTES and proceed — do not loop indefinitely.
+**Reviewer timeout or no current VERDICT?** The plugin reports the reviewer session id in the tool result. Inspect that child session and Chorus comments. If the reviewer exhausted its step budget, resolve manually: rerun the verification submission for another reviewer gate, reopen for rework if evidence is unclear, or escalate to a human. Do not silently verify on a missing quality-gate verdict.
 
 ---
 

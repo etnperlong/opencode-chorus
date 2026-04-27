@@ -8,6 +8,7 @@ import { createChorusRemoteMcpConfig } from "../../src/chorus/mcp-config"
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
+let getCommentsResponse: unknown = { comments: [] }
 const chorusSkillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 let configDir = ""
 let previousConfigDir: string | undefined
@@ -18,6 +19,7 @@ mock.module("../../src/chorus/mcp-client", () => ({
     async callTool(name: string, args: Record<string, unknown> = {}) {
       toolCalls.push({ name, args })
       if (name === "chorus_checkin") return { session: { uuid: "chorus-session-1" } }
+      if (name === "chorus_get_comments") return getCommentsResponse
       return {}
     }
 
@@ -47,6 +49,7 @@ describe("plugin hooks", () => {
     toolCalls.length = 0
     sessionCalls.length = 0
     logCalls.length = 0
+    getCommentsResponse = { comments: [] }
     if (previousConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
     else process.env.OPENCODE_CONFIG_DIR = previousConfigDir
     if (previousChorusApiKey === undefined) delete process.env.CHORUS_API_KEY
@@ -80,7 +83,10 @@ describe("plugin hooks", () => {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
         enableProposalReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
       })
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }] }
       const output: { title: string; output: string; metadata: unknown } = {
         title: "",
         output: JSON.stringify({ submitted: true }),
@@ -110,7 +116,10 @@ describe("plugin hooks", () => {
       expect(sessionCalls).toContainEqual({
         name: "promptAsync",
         args: expect.objectContaining({
-          body: expect.objectContaining({ agent: "proposal-reviewer" }),
+          body: expect.objectContaining({
+            agent: "proposal-reviewer",
+            parts: [{ type: "text", text: expect.stringContaining("Review-Job-ID: review-session-1") }],
+          }),
         }),
       })
       expect(output.title).toBe("Chorus proposal review")
@@ -119,7 +128,11 @@ describe("plugin hooks", () => {
         sessionId: "review-session-1",
         taskId: "review-session-1",
         agent: "proposal-reviewer",
+        reviewStatus: "completed",
+        verdict: "PASS",
       })
+      expect(output.output).toContain('"reviewer"')
+      expect(output.output).toContain('"verdict": "PASS"')
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -133,7 +146,10 @@ describe("plugin hooks", () => {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
         enableProposalReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
       })
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }] }
 
       await plugin["tool.execute.after"]?.(
         {
@@ -163,7 +179,10 @@ describe("plugin hooks", () => {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
         enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
       })
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: FAIL" }] }
       const output: { title: string; output: string; metadata: unknown } = {
         title: "",
         output: JSON.stringify({ submitted: true }),
@@ -200,7 +219,51 @@ describe("plugin hooks", () => {
         sessionId: "review-session-1",
         taskId: "review-session-1",
         agent: "task-reviewer",
+        reviewStatus: "completed",
+        verdict: "FAIL",
       })
+      expect(output.output).toContain('"reviewer"')
+      expect(output.output).toContain('"verdict": "FAIL"')
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("annotates reviewer timeouts on submitted tasks", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 5,
+        reviewerPollIntervalMs: 1,
+      })
+      getCommentsResponse = { comments: [{ content: "review without verdict" }] }
+      const output: { title: string; output: string; metadata: unknown } = {
+        title: "",
+        output: JSON.stringify({ submitted: true }),
+        metadata: { preserved: true },
+      }
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_submit_for_verify",
+          args: { taskUuid: "task-timeout" },
+          sessionID: "session-1",
+        } as never,
+        output as never,
+      )
+
+      expect(output.metadata).toEqual({
+        preserved: true,
+        sessionId: "review-session-1",
+        taskId: "review-session-1",
+        agent: "task-reviewer",
+        reviewStatus: "timeout",
+      })
+      expect(output.output).toContain("Reviewer did not finish before timeout")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -214,7 +277,10 @@ describe("plugin hooks", () => {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
         enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
       })
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }] }
 
       await plugin["tool.execute.after"]?.(
         {
@@ -244,7 +310,10 @@ describe("plugin hooks", () => {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
         enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
       })
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }] }
 
       await plugin["tool.execute.after"]?.(
         {
@@ -258,7 +327,7 @@ describe("plugin hooks", () => {
         {
           tool: "chorus_add_comment",
           args: { targetType: "task", targetUuid: "task-1", content: "review\nVERDICT: FAIL" },
-          sessionID: "session-1",
+          sessionID: "review-session-1",
         } as never,
         { output: JSON.stringify({}) } as never,
       )
@@ -266,6 +335,119 @@ describe("plugin hooks", () => {
       const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
       expect(state.reviews["task:task-1"].lastVerdict).toBe("FAIL")
       expect(state.reviews["task:task-1"].status).toBe("changes-requested")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("ignores stale verdict comments from non-current sessions during active review", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 1,
+        reviewerPollIntervalMs: 1,
+      })
+      getCommentsResponse = { comments: [] }
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_submit_for_verify",
+          args: { taskUuid: "task-active" },
+          sessionID: "session-1",
+        } as never,
+        { output: JSON.stringify({ submitted: true }) } as never,
+      )
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_add_comment",
+          args: { targetType: "task", targetUuid: "task-active", content: "stale\nVERDICT: FAIL" },
+          sessionID: "other-session",
+        } as never,
+        { output: JSON.stringify({}) } as never,
+      )
+
+      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
+      expect(state.reviews["task:task-active"].status).toBe("reviewing")
+      expect(state.reviews["task:task-active"].lastVerdict).toBeUndefined()
+      expect(state.reviews["task:task-active"].lastReviewJobId).toBe("review-session-1")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("ignores late verdict comments from old reviewer sessions after current review completes", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
+      })
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }] }
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_submit_for_verify",
+          args: { taskUuid: "task-completed" },
+          sessionID: "session-1",
+        } as never,
+        { output: JSON.stringify({ submitted: true }) } as never,
+      )
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_add_comment",
+          args: { targetType: "task", targetUuid: "task-completed", content: "late\nVERDICT: FAIL" },
+          sessionID: "old-review-session",
+        } as never,
+        { output: JSON.stringify({}) } as never,
+      )
+
+      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
+      expect(state.reviews["task:task-completed"].status).toBe("approved")
+      expect(state.reviews["task:task-completed"].lastVerdict).toBe("PASS")
+      expect(state.reviews["task:task-completed"].lastReviewJobId).toBe("review-session-1")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("ignores verdict comments while an active review has no current job id", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const statePath = join(rootDir, ".chorus", "opencode-state.json")
+      const state = JSON.parse(await readFile(statePath, "utf8"))
+      state.reviews["task:task-without-job"] = {
+        currentRound: 1,
+        maxRounds: 3,
+        status: "reviewing",
+        blockersSnapshot: [],
+      }
+      await writeFile(statePath, JSON.stringify(state, null, 2))
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_add_comment",
+          args: { targetType: "task", targetUuid: "task-without-job", content: "review\nVERDICT: FAIL" },
+          sessionID: "some-session",
+        } as never,
+        { output: JSON.stringify({}) } as never,
+      )
+
+      const nextState = JSON.parse(await readFile(statePath, "utf8"))
+      expect(nextState.reviews["task:task-without-job"].status).toBe("reviewing")
+      expect(nextState.reviews["task:task-without-job"].lastVerdict).toBeUndefined()
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

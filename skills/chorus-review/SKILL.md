@@ -70,16 +70,16 @@ Key responsibilities:
 
 ## Review Strategy
 
-When reviewing proposals or tasks, prefer spawning an independent reviewer sub-agent over reviewing manually:
+When reviewing proposals or tasks, use the automatic reviewer gate before manual judgment:
 
-1. **Try the reviewer first.** Spawn `chorus:proposal-reviewer` (for proposals) or `chorus:task-reviewer` (for tasks) as a read-only sub-agent. Run it in foreground — you must wait for the VERDICT before proceeding. It posts a VERDICT comment with detailed findings.
-2. **Read the VERDICT.** After the reviewer completes, call `chorus_get_comments` and find the most recent comment containing `VERDICT:`. There are exactly three possible outcomes:
+1. **Use the reviewer gate first.** `chorus_pm_submit_proposal` auto-launches `proposal-reviewer`; `chorus_submit_for_verify` auto-launches `task-reviewer`. The plugin waits for the current reviewer VERDICT or timeout before returning the tool result. The reviewer posts a VERDICT comment with detailed findings.
+2. **Read the VERDICT.** After the gated tool result returns, inspect the reviewer result and, if needed, call `chorus_get_comments` to find the current comment containing `VERDICT:`. There are exactly three possible outcomes:
    - **VERDICT: PASS** — No issues found. Approve (proposals) or mark AC passed and verify (tasks).
    - **VERDICT: PASS WITH NOTES** — Minor non-blocking notes. Still approve/verify. Notes are informational.
    - **VERDICT: FAIL** — BLOCKERs found. Reject (proposals) or reopen (tasks). Fix the specific BLOCKERs listed in the comment before resubmitting.
-3. **No new VERDICT comment?** The reviewer exhausted its step budget before posting. Respawn it ONCE with an explicit prompt like: *"Stay within your step budget. Skip deep source verification — batch all MCP fetches up front, skim for obvious BLOCKERs only, and reserve your last few steps to post the VERDICT comment."* If the second attempt also fails to post, review manually using the checklists below.
-4. **Track rounds.** Count existing VERDICT comments before spawning. After 3 rounds of FAIL on the same item, stop the loop and escalate to human review.
-5. **Fallback.** If the reviewer is unavailable (e.g., agent type not registered, sub-agent spawn fails), review the item yourself using the quality checklists in the workflows below.
+3. **Reviewer timeout or no current VERDICT?** Inspect the reported reviewer child session and Chorus comments. Do not silently approve or verify. Resubmit for another reviewer gate, reopen/reject if evidence is unclear, or escalate to human review.
+4. **Track rounds.** Use the plugin's max review round settings and existing VERDICT comments. After repeated FAIL verdicts on the same item, stop the loop and escalate to human review.
+5. **Fallback.** If the reviewer gate is unavailable (e.g., agent type not registered, sub-agent spawn fails, or timeout persists), review the item yourself using the quality checklists below and record the reason for manual handling.
 
 ---
 
@@ -151,7 +151,7 @@ chorus_get_comments({ targetType: "proposal", targetUuid: "<proposal-uuid>" })
 
 #### A3.5: Independent Review
 
-Spawn `chorus:proposal-reviewer` per the [Review Strategy](#review-strategy) above — foreground, not background. Read its VERDICT comment before proceeding.
+If the proposal just returned from `chorus_pm_submit_proposal`, use the gated reviewer result from that submit call. Otherwise, read the latest reviewer VERDICT comment and apply the [Review Strategy](#review-strategy) above before proceeding.
 
 #### A4: Approve or Reject
 
@@ -216,7 +216,7 @@ chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
 
 #### B2.5: Independent Review
 
-Spawn `chorus:task-reviewer` per the [Review Strategy](#review-strategy) above — foreground, not background. After it completes, read its VERDICT:
+Use the gated reviewer result from `chorus_submit_for_verify`, or read the latest reviewer VERDICT comment if you are resuming verification later:
 
 - **VERDICT: PASS** or **PASS WITH NOTES** → proceed to B3 (mark AC) and B4 (verify).
 - **VERDICT: FAIL** → skip to B4 and **reopen** the task. Do NOT mark AC as passed.

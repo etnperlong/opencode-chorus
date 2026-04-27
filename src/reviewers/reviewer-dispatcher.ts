@@ -10,6 +10,7 @@ type DispatchReviewerOptions = {
   round: number
   maxRounds: number
   parentSessionID?: string
+  onSessionCreated?: (sessionId: string) => Promise<void>
 }
 
 export async function dispatchProposalReviewer(options: DispatchReviewerOptions): Promise<string> {
@@ -44,13 +45,19 @@ async function dispatchReviewer(
   })
   const sessionId = extractSessionId(session)
   if (!sessionId) throw new Error(`Failed to create ${options.agent} session`)
+  await options.onSessionCreated?.(sessionId)
 
   await options.client.session.promptAsync({
     path: { id: sessionId },
     query: { directory: options.directory },
     body: {
       agent: options.agent,
-      parts: [{ type: "text", text: options.prompt }],
+      parts: [
+        {
+          type: "text",
+          text: `${options.prompt}\n\nInclude this exact line in the Chorus comment content before or near the verdict line:\nReview-Job-ID: ${sessionId}`,
+        },
+      ],
     },
     throwOnError: true,
   })

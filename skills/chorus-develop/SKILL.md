@@ -222,9 +222,9 @@ chorus_submit_for_verify({
 
 > `to_verify` does NOT unblock downstream tasks — only `done` (after admin verification) does.
 
-> **Review Agent:** After `chorus_submit_for_verify`, the opencode-chorus plugin's PostToolUse hook injects context instructing you to spawn `chorus:task-reviewer` — an independent, read-only review agent. You MUST spawn it yourself (it is NOT auto-launched). Run it in foreground and wait for the VERDICT before proceeding. The reviewer posts a VERDICT comment on the task.
+> **Review Agent:** After `chorus_submit_for_verify`, the opencode-chorus plugin auto-launches `task-reviewer` as an independent, read-only child sub-agent and waits for its current VERDICT or timeout before returning the tool result. The reviewer posts a VERDICT comment on the task.
 
-After the reviewer completes, read its VERDICT:
+After the gated reviewer result returns, read its VERDICT from the tool result or comments:
 ```
 chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
 ```
@@ -234,7 +234,7 @@ Find the most recent comment containing `VERDICT:` and act on it:
 - **VERDICT: PASS WITH NOTES** — All AC verified, minor notes. Proceed to admin verification (notes are non-blocking).
 - **VERDICT: FAIL** — BLOCKERs found. Do NOT verify. Fix the BLOCKERs listed in the reviewer's comment, then resubmit.
 
-If no new `VERDICT:` comment appears after the reviewer returns, it exhausted its step budget before posting. Respawn it ONCE with a concise-budget hint in the prompt: *"Stay within step budget. Skip deep verification. Fetch task, proposal, and comments; run only the core tests, and post your VERDICT comment within the first 12 steps."* If the second attempt still produces no VERDICT, review manually using the checklist and proceed.
+If the reviewer times out or no current `VERDICT:` comment appears, inspect the reported reviewer child session and Chorus comments. Do not silently proceed: resubmit for another reviewer gate, reopen for more work if evidence is unclear, or escalate for human review.
 
 ### Step 9: Handle Review Feedback
 
