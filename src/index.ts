@@ -12,9 +12,9 @@ import { routeNotification } from "./notifications/notification-router"
 import { ChorusSseListener, type SseNotificationEvent } from "./notifications/sse-listener"
 import { resolvePlanningSessionId } from "./planning/planning-rules"
 import { parseVerdict } from "./reviewers/review-parser"
-import { beginReviewRound, persistReviewVerdict } from "./reviewers/review-sync"
-import { runProposalReviewer } from "./reviewers/proposal-reviewer"
-import { runTaskReviewer } from "./reviewers/task-reviewer"
+import { dispatchProposalReviewer, dispatchTaskReviewer } from "./reviewers/reviewer-dispatcher"
+import { applyReviewerAgentConfig } from "./reviewers/reviewer-agents"
+import { beginReviewRound, persistReviewJobId, persistReviewVerdict } from "./reviewers/review-sync"
 import { StateStore } from "./state/state-store"
 import { createLogger } from "./util/logger"
 
@@ -46,6 +46,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     .catch((error) => logger.warn("Chorus notification listener stopped", { error: formatError(error) }))
 
   return {
+    config: applyReviewerAgentConfig,
     tool: createChorusTools(chorusClient),
     event: async ({ event }) => {
       await logger.debug("Observed OpenCode event", { type: event.type })
@@ -85,29 +86,57 @@ export const createPlugin: Plugin = async (ctx, options) => {
         await planningLifecycle.markTodo(sessionId, planningPatch)
       }
 
+      if (input.tool === "chorus_add_comment") {
+        const targetType = extractStringField(input.args, "targetType")
+        if (targetType !== "proposal" && targetType !== "task") return
+
+        const targetUuid = extractStringField(input.args, "targetUuid")
+        const content = extractStringField(input.args, "content")
+        if (!targetUuid || !content) return
+
+        let verdict: ReturnType<typeof parseVerdict>
+        try {
+          verdict = parseVerdict(content)
+        } catch {
+          return
+        }
+
+        await persistReviewVerdict(stateStore, `${targetType}:${targetUuid}`, verdict)
+      }
+
       if (input.tool === "chorus_pm_submit_proposal" && config.enableProposalReviewer) {
         const proposalUuid =
           extractStringField(input.args, "proposalUuid") ?? extractStringField(parseJsonObject(output.output), "proposalUuid")
         if (!proposalUuid) return
 
-        const reviewText = "### Review Summary\n\nVERDICT: PASS"
         const targetKey = `proposal:${proposalUuid}`
         const review = await beginReviewRound(stateStore, targetKey, config.maxProposalReviewRounds)
         if (review?.status === "escalated") return
-        await runProposalReviewer(chorusClient, proposalUuid, reviewText)
-        await persistReviewVerdict(stateStore, targetKey, parseVerdict(reviewText))
+        const reviewJobId = await dispatchProposalReviewer({
+          client: ctx.client,
+          directory: ctx.directory,
+          targetUuid: proposalUuid,
+          round: review.currentRound,
+          maxRounds: review.maxRounds,
+        })
+        await persistReviewJobId(stateStore, targetKey, reviewJobId)
       }
 
       if (input.tool === "chorus_submit_for_verify" && config.enableTaskReviewer) {
         const taskUuid = extractStringField(input.args, "taskUuid")
         if (!taskUuid) return
 
-        const reviewText = "### Review Summary\n\nVERDICT: PASS"
         const targetKey = `task:${taskUuid}`
         const review = await beginReviewRound(stateStore, targetKey, config.maxTaskReviewRounds)
         if (review?.status === "escalated") return
-        await runTaskReviewer(chorusClient, taskUuid, reviewText)
-        await persistReviewVerdict(stateStore, targetKey, parseVerdict(reviewText))
+        const reviewJobId = await dispatchTaskReviewer({
+          client: ctx.client,
+          directory: ctx.directory,
+          targetUuid: taskUuid,
+          round: review.currentRound,
+          maxRounds: review.maxRounds,
+        })
+        await persistReviewJobId(stateStore, targetKey, reviewJobId)
       }
     },
   }

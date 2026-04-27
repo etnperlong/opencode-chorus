@@ -48,3 +48,21 @@ export async function persistReviewVerdict(
     }
   })
 }
+
+export async function persistReviewJobId(stateStore: StateStore, targetKey: string, jobId: string): Promise<void> {
+  await stateStore.updateOpenCodeState((state) => {
+    const existing = state.reviews[targetKey]
+    if (!existing) return state
+
+    return {
+      ...state,
+      reviews: {
+        ...state.reviews,
+        [targetKey]: {
+          ...existing,
+          lastReviewJobId: jobId,
+        },
+      },
+    }
+  })
+}

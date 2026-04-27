@@ -1,5 +1,6 @@
 ---
 description: Chorus quick development workflow for OpenCode. Use for small approved changes that can be implemented and verified without a full proposal cycle.
+version: 0.7.5
 ---
 
 # Quick Development Skill
