@@ -13,6 +13,7 @@ import { routeNotification } from "./notifications/notification-router"
 import { ChorusSseListener, type SseNotificationEvent } from "./notifications/sse-listener"
 import { resolvePlanningSessionId } from "./planning/planning-rules"
 import { parseVerdict } from "./reviewers/review-parser"
+import { PROPOSAL_REVIEWER_AGENT, TASK_REVIEWER_AGENT } from "./reviewers/reviewer-agents"
 import { dispatchProposalReviewer, dispatchTaskReviewer } from "./reviewers/reviewer-dispatcher"
 import { beginReviewRound, persistReviewJobId, persistReviewVerdict } from "./reviewers/review-sync"
 import { StateStore } from "./state/state-store"
@@ -136,7 +137,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
           targetUuid: proposalUuid,
           round: review.currentRound,
           maxRounds: review.maxRounds,
+          parentSessionID: input.sessionID,
         })
+        attachReviewerMetadata(output, "Chorus proposal review", PROPOSAL_REVIEWER_AGENT, reviewJobId)
         await persistReviewJobId(stateStore, targetKey, reviewJobId)
       }
 
@@ -153,7 +156,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
           targetUuid: taskUuid,
           round: review.currentRound,
           maxRounds: review.maxRounds,
+          parentSessionID: input.sessionID,
         })
+        attachReviewerMetadata(output, "Chorus task review", TASK_REVIEWER_AGENT, reviewJobId)
         await persistReviewJobId(stateStore, targetKey, reviewJobId)
       }
     },
@@ -212,6 +217,25 @@ function normalizeChorusToolName(tool: string): string {
   const nativePrefix = "chorus_chorus_"
   if (tool.startsWith(nativePrefix)) return tool.slice("chorus_".length)
   return tool
+}
+
+function attachReviewerMetadata(
+  output: { title: string; metadata: unknown },
+  title: string,
+  agent: string,
+  sessionId: string,
+): void {
+  output.title = title
+  output.metadata = {
+    ...(isRecord(output.metadata) ? output.metadata : {}),
+    sessionId,
+    taskId: sessionId,
+    agent,
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {

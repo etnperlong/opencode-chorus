@@ -81,6 +81,11 @@ describe("plugin hooks", () => {
         apiKey: "test-key",
         enableProposalReviewer: true,
       })
+      const output: { title: string; output: string; metadata: unknown } = {
+        title: "",
+        output: JSON.stringify({ submitted: true }),
+        metadata: { preserved: true },
+      }
 
       await plugin["tool.execute.after"]?.(
         {
@@ -88,19 +93,32 @@ describe("plugin hooks", () => {
           args: { proposalUuid: "proposal-from-args" },
           sessionID: "session-1",
         } as never,
-        { output: JSON.stringify({ submitted: true }) } as never,
+        output as never,
       )
 
       expect(toolCalls.map((call) => call.name)).not.toContain("chorus_add_comment")
       expect(sessionCalls).toContainEqual({
         name: "create",
-        args: expect.objectContaining({ responseStyle: "data" }),
+        args: expect.objectContaining({
+          responseStyle: "data",
+          body: expect.objectContaining({
+            parentID: "session-1",
+            title: "Chorus proposal review: proposal-from-args (@proposal-reviewer subagent)",
+          }),
+        }),
       })
       expect(sessionCalls).toContainEqual({
         name: "promptAsync",
         args: expect.objectContaining({
           body: expect.objectContaining({ agent: "proposal-reviewer" }),
         }),
+      })
+      expect(output.title).toBe("Chorus proposal review")
+      expect(output.metadata).toEqual({
+        preserved: true,
+        sessionId: "review-session-1",
+        taskId: "review-session-1",
+        agent: "proposal-reviewer",
       })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -146,6 +164,11 @@ describe("plugin hooks", () => {
         apiKey: "test-key",
         enableTaskReviewer: true,
       })
+      const output: { title: string; output: string; metadata: unknown } = {
+        title: "",
+        output: JSON.stringify({ submitted: true }),
+        metadata: "not-an-object",
+      }
 
       await plugin["tool.execute.after"]?.(
         {
@@ -153,15 +176,30 @@ describe("plugin hooks", () => {
           args: { taskUuid: "task-from-args" },
           sessionID: "session-1",
         } as never,
-        { output: JSON.stringify({ submitted: true }) } as never,
+        output as never,
       )
 
       expect(toolCalls.map((call) => call.name)).not.toContain("chorus_add_comment")
+      expect(sessionCalls).toContainEqual({
+        name: "create",
+        args: expect.objectContaining({
+          body: expect.objectContaining({
+            parentID: "session-1",
+            title: "Chorus task review: task-from-args (@task-reviewer subagent)",
+          }),
+        }),
+      })
       expect(sessionCalls).toContainEqual({
         name: "promptAsync",
         args: expect.objectContaining({
           body: expect.objectContaining({ agent: "task-reviewer" }),
         }),
+      })
+      expect(output.title).toBe("Chorus task review")
+      expect(output.metadata).toEqual({
+        sessionId: "review-session-1",
+        taskId: "review-session-1",
+        agent: "task-reviewer",
       })
     } finally {
       await rm(rootDir, { recursive: true, force: true })

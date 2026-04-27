@@ -9,13 +9,14 @@ type DispatchReviewerOptions = {
   targetUuid: string
   round: number
   maxRounds: number
+  parentSessionID?: string
 }
 
 export async function dispatchProposalReviewer(options: DispatchReviewerOptions): Promise<string> {
   return dispatchReviewer({
     ...options,
     agent: PROPOSAL_REVIEWER_AGENT,
-    title: `Chorus proposal review: ${options.targetUuid}`,
+    title: `Chorus proposal review: ${options.targetUuid} (@${PROPOSAL_REVIEWER_AGENT} subagent)`,
     prompt: `Review Chorus proposal ${options.targetUuid}.\n\nReview round: ${options.round} of ${options.maxRounds}.\n\nFetch the proposal and comments through Chorus tools, post exactly one chorus_add_comment review, and end with VERDICT: PASS, VERDICT: PASS WITH NOTES, or VERDICT: FAIL.`,
   })
 }
@@ -24,7 +25,7 @@ export async function dispatchTaskReviewer(options: DispatchReviewerOptions): Pr
   return dispatchReviewer({
     ...options,
     agent: TASK_REVIEWER_AGENT,
-    title: `Chorus task review: ${options.targetUuid}`,
+    title: `Chorus task review: ${options.targetUuid} (@${TASK_REVIEWER_AGENT} subagent)`,
     prompt: `Review Chorus task ${options.targetUuid}.\n\nReview round: ${options.round} of ${options.maxRounds}.\n\nFetch the task, proposal context, and comments through Chorus tools, inspect only what is needed, post exactly one chorus_add_comment review, and end with VERDICT: PASS, VERDICT: PASS WITH NOTES, or VERDICT: FAIL.`,
   })
 }
@@ -32,9 +33,12 @@ export async function dispatchTaskReviewer(options: DispatchReviewerOptions): Pr
 async function dispatchReviewer(
   options: DispatchReviewerOptions & { agent: string; title: string; prompt: string },
 ): Promise<string> {
+  const body: { title: string; parentID?: string } = { title: options.title }
+  if (options.parentSessionID) body.parentID = options.parentSessionID
+
   const session = await options.client.session.create({
     query: { directory: options.directory },
-    body: { title: options.title },
+    body,
     responseStyle: "data",
     throwOnError: true,
   })
