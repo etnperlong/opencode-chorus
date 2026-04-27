@@ -1,6 +1,6 @@
 {
   "name": "opencode-chorus",
-  "module": "index.ts",
+  "module": "src/index.ts",
   "license": "AGPL-3.0-only",
   "type": "module",
   "private": true,

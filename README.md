@@ -14,7 +14,7 @@ Enable the plugin through OpenCode's normal plugin mechanisms. For local develop
 
 ```ts
 // ~/.config/opencode/plugins/chorus.ts
-import ChorusPlugin from "/absolute/path/to/opencode-chorus/index.ts"
+import ChorusPlugin from "/absolute/path/to/opencode-chorus/src/index.ts"
 
 export const ChorusLocalPlugin = ChorusPlugin
 ```

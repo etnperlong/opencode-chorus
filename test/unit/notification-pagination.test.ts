@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { fetchUnreadNotificationByUuid } from "../../src/index"
+import { fetchUnreadNotificationByUuid } from "../../src/notifications/notification-pagination"
 
 describe("fetchUnreadNotificationByUuid", () => {
   it("searches bounded unread notification pages until it finds the matching notification", async () => {

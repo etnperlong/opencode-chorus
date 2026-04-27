@@ -1,18 +1,13 @@
-type OpenCodeSessionEvent = {
-  type?: string
-  properties?: {
-    info?: { id?: unknown }
-    sessionID?: unknown
-  }
-}
-
 type MainSessionState = {
   runtimeSessionId?: string
   status: "idle" | "active" | "closed"
 }
 
-export function extractSessionEventId(event: OpenCodeSessionEvent): string | undefined {
-  const id = event.properties?.info?.id ?? event.properties?.sessionID
+export function extractSessionEventId(event: unknown): string | undefined {
+  if (!isRecord(event)) return undefined
+  const properties = isRecord(event.properties) ? event.properties : undefined
+  const info = properties && isRecord(properties.info) ? properties.info : undefined
+  const id = info?.id ?? properties?.sessionID
   return typeof id === "string" && id.length > 0 ? id : undefined
 }
 
@@ -35,4 +30,8 @@ export function shouldReplaceMainSessionOnStartup(
 
 export function isTrackedSessionEvent(currentRuntimeSessionId: string | undefined, eventRuntimeSessionId: string): boolean {
   return currentRuntimeSessionId === eventRuntimeSessionId
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
 }
