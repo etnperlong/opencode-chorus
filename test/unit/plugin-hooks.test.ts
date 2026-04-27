@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { createChorusRemoteMcpConfig } from "../../src/chorus/mcp-config"
 
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
@@ -106,6 +107,36 @@ describe("plugin hooks", () => {
     }
   })
 
+  it("reviews submitted proposals from native Chorus MCP tool names", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableProposalReviewer: true,
+      })
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_chorus_pm_submit_proposal",
+          args: { proposalUuid: "native-proposal" },
+          sessionID: "session-1",
+        } as never,
+        { output: JSON.stringify({ submitted: true }) } as never,
+      )
+
+      expect(sessionCalls).toContainEqual({
+        name: "promptAsync",
+        args: expect.objectContaining({
+          body: expect.objectContaining({ agent: "proposal-reviewer" }),
+        }),
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
   it("reviews submitted tasks using a task reviewer session", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
@@ -126,6 +157,36 @@ describe("plugin hooks", () => {
       )
 
       expect(toolCalls.map((call) => call.name)).not.toContain("chorus_add_comment")
+      expect(sessionCalls).toContainEqual({
+        name: "promptAsync",
+        args: expect.objectContaining({
+          body: expect.objectContaining({ agent: "task-reviewer" }),
+        }),
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("reviews submitted tasks from native Chorus MCP tool names", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+      })
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_chorus_submit_for_verify",
+          args: { taskUuid: "native-task" },
+          sessionID: "session-1",
+        } as never,
+        { output: JSON.stringify({ submitted: true }) } as never,
+      )
+
       expect(sessionCalls).toContainEqual({
         name: "promptAsync",
         args: expect.objectContaining({
@@ -167,6 +228,32 @@ describe("plugin hooks", () => {
       const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
       expect(state.reviews["task:task-1"].lastVerdict).toBe("FAIL")
       expect(state.reviews["task:task-1"].status).toBe("changes-requested")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("persists review verdicts from native Chorus MCP comment tool names", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_chorus_add_comment",
+          args: { targetType: "proposal", targetUuid: "proposal-1", content: "review\nVERDICT: PASS" },
+          sessionID: "session-1",
+        } as never,
+        { output: JSON.stringify({}) } as never,
+      )
+
+      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
+      expect(state.reviews["proposal:proposal-1"].lastVerdict).toBe("PASS")
+      expect(state.reviews["proposal:proposal-1"].status).toBe("approved")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -234,17 +321,117 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("registers bundled Chorus skills when runtime Chorus config is missing", async () => {
+  it("returns config-only fallback behavior when runtime Chorus config is missing", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
       const plugin = await createPlugin(createContext(rootDir), {})
       const config: Record<string, unknown> = {}
 
+      expect(plugin.config).toBeFunction()
+      expect(plugin.event).toBeUndefined()
+      expect(plugin.tool).toBeUndefined()
+      expect(plugin["tool.execute.after"]).toBeUndefined()
+
       await plugin.config?.(config as never)
 
       expect(config.skills).toEqual({
         paths: [chorusSkillsDir],
+      })
+      expect(config.mcp).toBeUndefined()
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("injects a native Chorus MCP server when runtime config is available", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const config: Record<string, unknown> = {
+        mcp: {
+          context7: {
+            type: "remote",
+            url: "https://mcp.context7.com/mcp",
+            enabled: true,
+          },
+        },
+      }
+
+      await plugin.config?.(config as never)
+
+      expect(config.mcp).toEqual({
+        context7: {
+          type: "remote",
+          url: "https://mcp.context7.com/mcp",
+          enabled: true,
+        },
+        chorus: createChorusRemoteMcpConfig("http://localhost:8637", "test-key"),
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not inject a native Chorus MCP server when runtime config is missing", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {})
+      const config: Record<string, unknown> = {
+        mcp: {
+          context7: {
+            type: "remote",
+            url: "https://mcp.context7.com/mcp",
+            enabled: true,
+          },
+        },
+      }
+
+      await plugin.config?.(config as never)
+
+      expect(config.mcp).toEqual({
+        context7: {
+          type: "remote",
+          url: "https://mcp.context7.com/mcp",
+          enabled: true,
+        },
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not overwrite an existing user-provided chorus MCP entry", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const config: Record<string, unknown> = {
+        mcp: {
+          chorus: {
+            type: "remote",
+            url: "https://custom.example/mcp",
+            enabled: false,
+          },
+        },
+      }
+
+      await plugin.config?.(config as never)
+
+      expect(config.mcp).toEqual({
+        chorus: {
+          type: "remote",
+          url: "https://custom.example/mcp",
+          enabled: false,
+        },
       })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -267,7 +454,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("returns runtime hooks when valid Chorus config is present", async () => {
+  it("returns runtime hooks without plugin-defined wrapper tools when valid Chorus config is present", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -278,8 +465,8 @@ describe("plugin hooks", () => {
 
       expect(plugin.config).toBeFunction()
       expect(plugin.event).toBeFunction()
-      expect(plugin.tool).toBeDefined()
       expect(plugin["tool.execute.after"]).toBeFunction()
+      expect(plugin.tool).toBeUndefined()
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

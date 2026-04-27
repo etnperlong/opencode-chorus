@@ -30,7 +30,7 @@ When published as an npm package, the intended OpenCode config is:
 
 ## Configuration
 
-Configure Chorus separately from OpenCode's `plugin` array. The plugin reads `chorus.json` from the OpenCode config directory and then applies environment variable overrides.
+Configure Chorus separately from OpenCode's `plugin` array. The plugin reads `chorus.json` from the OpenCode config directory and then applies environment variable overrides. When `chorusUrl` and `apiKey` are available, the plugin also auto-registers a native `chorus` remote MCP server in OpenCode. If either credential is missing, bundled skills and reviewer-agent config still load, but the native Chorus MCP server is not injected until OpenCode is restarted with valid credentials.
 
 Default config file path:
 
@@ -94,7 +94,7 @@ defaults < chorus.json < environment variables < explicit plugin options
 
 ## Features
 
-- Chorus MCP tools in OpenCode
+- native Chorus MCP auto-registration in OpenCode
 - `.chorus` compatibility with isolated OpenCode state
 - proposal planning scope
 - automated proposal and task reviewer comments with review-state persistence
@@ -116,13 +116,14 @@ Compatibility files under `.chorus/` allow Chorus sessions, shared project metad
 
 These steps require a running Chorus development server and valid Chorus credentials. Local verification only covers tests and typechecking; live OpenCode plugin loading, Chorus connectivity, SSE routing, and reviewer comment posting must be run separately against a real Chorus server.
 
-1. Load the plugin in OpenCode with valid `chorusUrl` and `apiKey`
-2. Confirm `.chorus/opencode-state.json` is created
-3. Confirm `.chorus/sessions/main.json` appears after session start
-4. Run `chorus_checkin`, then run `chorus_get_task` with a valid `taskUuid` from the current project
-5. Submit a proposal and verify a proposal review comment is posted
-6. Submit a task for verification and verify a task review comment is posted
-7. Seed or create a running worker record, restart the session, and confirm it is marked `aborted` with `finishedAt` in `.chorus/opencode-state.json`
+1. Load the plugin in OpenCode with valid `chorusUrl` and `apiKey`, then restart OpenCode after any credential change
+2. Confirm the native `chorus` MCP server appears in OpenCode's MCP list
+3. Confirm `.chorus/opencode-state.json` is created
+4. Confirm `.chorus/sessions/main.json` appears after session start
+5. Use the native Chorus MCP tool surface to run `chorus_checkin`, then run `chorus_get_task` with a valid `taskUuid` from the current project
+6. Complete a native proposal flow ending with `chorus_pm_submit_proposal` and verify a proposal review comment is posted
+7. Complete a native task verification flow ending with `chorus_submit_for_verify` and verify a task review comment is posted
+8. Seed or create a running worker record, restart the session, and confirm it is marked `aborted` with `finishedAt` in `.chorus/opencode-state.json`
 
 ## Skills
 

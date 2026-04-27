@@ -1,8 +1,7 @@
 import type { Plugin } from "@opencode-ai/plugin"
 import { ChorusMcpClient } from "./chorus/mcp-client"
-import { createChorusTools } from "./chorus/tool-registry"
 import { loadChorusConfig } from "./config/config-loader"
-import { applyPluginConfig } from "./config/plugin-config"
+import { createPluginConfigApplier } from "./config/plugin-config"
 import { MissingRequiredConfigError } from "./config/schema"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { markInterruptedReviews } from "./lifecycle/reviewer-lifecycle"
@@ -27,12 +26,16 @@ export const createPlugin: Plugin = async (ctx, options) => {
   } catch (error) {
     if (isMissingRequiredConfigError(error)) {
       return {
-        config: applyPluginConfig,
+        config: createPluginConfigApplier(),
       }
     }
     throw error
   }
   const config = loadedConfig.config
+  const applyPluginConfig = createPluginConfigApplier({
+    chorusUrl: config.chorusUrl,
+    apiKey: config.apiKey,
+  })
   const stateStore = new StateStore(ctx.directory, config.stateDir)
   await stateStore.init()
   const chorusClient = new ChorusMcpClient({
@@ -62,7 +65,6 @@ export const createPlugin: Plugin = async (ctx, options) => {
 
   return {
     config: applyPluginConfig,
-    tool: createChorusTools(chorusClient),
     event: async ({ event }) => {
       await logger.debug("Observed OpenCode event", { type: event.type })
 
@@ -93,7 +95,8 @@ export const createPlugin: Plugin = async (ctx, options) => {
       }
     },
     "tool.execute.after": async (input, output) => {
-      const planningPatch = planningPatchForTool(input.tool)
+      const tool = normalizeChorusToolName(input.tool)
+      const planningPatch = planningPatchForTool(tool)
       if (planningPatch) {
         const state = await stateStore.readOpenCodeState()
         const sessionId = resolvePlanningSessionId(input.sessionID, state.mainSession.runtimeSessionId, stateStore.paths.stateFile)
@@ -101,7 +104,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
         await planningLifecycle.markTodo(sessionId, planningPatch)
       }
 
-      if (input.tool === "chorus_add_comment") {
+      if (tool === "chorus_add_comment") {
         const targetType = extractStringField(input.args, "targetType")
         if (targetType !== "proposal" && targetType !== "task") return
 
@@ -119,7 +122,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
         await persistReviewVerdict(stateStore, `${targetType}:${targetUuid}`, verdict)
       }
 
-      if (input.tool === "chorus_pm_submit_proposal" && config.enableProposalReviewer) {
+      if (tool === "chorus_pm_submit_proposal" && config.enableProposalReviewer) {
         const proposalUuid =
           extractStringField(input.args, "proposalUuid") ?? extractStringField(parseJsonObject(output.output), "proposalUuid")
         if (!proposalUuid) return
@@ -137,7 +140,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
         await persistReviewJobId(stateStore, targetKey, reviewJobId)
       }
 
-      if (input.tool === "chorus_submit_for_verify" && config.enableTaskReviewer) {
+      if (tool === "chorus_submit_for_verify" && config.enableTaskReviewer) {
         const taskUuid = extractStringField(input.args, "taskUuid")
         if (!taskUuid) return
 
@@ -203,6 +206,12 @@ function planningPatchForTool(tool: string) {
   if (tool === "chorus_add_task_draft") return { taskDraftReady: true }
   if (tool === "chorus_update_task_draft") return { dependenciesReady: true }
   if (tool === "chorus_pm_submit_proposal") return { submittedOrApproved: true }
+}
+
+function normalizeChorusToolName(tool: string): string {
+  const nativePrefix = "chorus_chorus_"
+  if (tool.startsWith(nativePrefix)) return tool.slice("chorus_".length)
+  return tool
 }
 
 function parseJsonObject(text: string): Record<string, unknown> | null {
