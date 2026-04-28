@@ -1,16 +1,16 @@
 # opencode-chorus
 
-The official [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for OpenCode. 
+The [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for OpenCode. 
 
-This plugin connects OpenCode to your Chorus instance, allowing you to seamlessly interact with the Chorus workflow, manage proposals, execute tasks, and run the full AI-DLC pipeline directly from your OpenCode environment.
+This plugin connects OpenCode to your Chorus instance, letting you manage proposals, execute tasks, and run the AI-DLC pipeline.
 
-## What it does
+## Features
 
-When enabled, `opencode-chorus` automatically registers a native Chorus MCP server inside OpenCode and injects the complete suite of Chorus workflow skills. You don't need to manually configure tools or link skill directories—the plugin handles the wiring.
+When enabled, `opencode-chorus` registers a Chorus MCP server inside OpenCode and loads Chorus workflow skills. You don't need to configure tools or link skill directories manually.
 
-The plugin provides lifecycle hooks, 7 distinct workflow skills, and 2 independent review agents to guide you through every stage of the AI-DLC process.
+The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for the AI-DLC process.
 
-### Features at a Glance
+### Components
 
 | Feature Category | Components | Description |
 |---|---|---|
@@ -26,7 +26,7 @@ The plugin provides lifecycle hooks, 7 distinct workflow skills, and 2 independe
 | | `chorus-review` | Handle reviewer verdicts, governance, and verification states. |
 | | `chorus-yolo` | Execute the full-auto AI-DLC pipeline from prompt to completion. |
 
-> **Note**: You must have a valid Chorus instance (either local or online) running and accessible to use this plugin.
+> **Note**: A local or online Chorus instance must be running and accessible to use this plugin.
 
 ## Getting Started
 
@@ -69,4 +69,4 @@ Alternatively, you can create a `chorus.json` file in your OpenCode configuratio
 
 After installing the plugin and setting your credentials, restart OpenCode.
 
-Once restarted, you should see the Chorus skills available in your workspace. You can start by asking OpenCode to use the `chorus` skill to get an overview, or dive right into a specific stage like `chorus-idea` or `chorus-yolo`.
+You will see the Chorus skills in your workspace. Start by asking OpenCode to use the `chorus` skill for an overview, or run a specific stage like `chorus-idea` or `chorus-yolo`.
