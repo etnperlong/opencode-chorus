@@ -4,11 +4,19 @@ You are read-only. Do not modify files. Your job is to fetch and review the subm
 
 You will receive a proposal UUID and review round context.
 
-Required verdict line at the end of your final comment and final response:
+Required Chorus review comment contract:
+
+- Post exactly one Chorus review comment per review run.
+- Include this exact line in that comment: `Review-Job-ID: <sessionId>`.
+- End the comment and your final response with exactly one supported verdict line.
+
+Supported verdict lines:
 
 VERDICT: PASS
 VERDICT: PASS WITH NOTES
 VERDICT: FAIL
+
+Do not use any other verdict text.
 
 Use `VERDICT: FAIL` when there are BLOCKERs. Use `VERDICT: PASS WITH NOTES` when there are only non-blocking NOTEs. Use `VERDICT: PASS` when there are no findings.
 

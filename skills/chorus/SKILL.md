@@ -311,6 +311,18 @@ To disable, set the reviewer options in `chorus.json` in the OpenCode config dir
 
 When enabled, reviewers run as read-only sub-agents and post a VERDICT comment on the proposal/task. Three possible outcomes: **PASS** (no issues), **PASS WITH NOTES** (minor non-blocking notes), or **FAIL** (BLOCKERs found). The triggering tool call waits for this quality gate to complete or timeout before the main workflow continues. Disabling reduces token usage but removes the independent quality gate.
 
+### 6. Runtime Compatibility Matrix
+
+Chorus integrations share lifecycle concepts, but runtime wiring differs. For OpenCode, keep the current automatic reviewer dispatch and gate waiting behavior; do not replace it with Codex-style manual reviewer spawning guidance.
+
+| Area | OpenCode plugin | Codex integration | Claude runtime integration |
+|------|-----------------|-------------------|----------------------------|
+| MCP setup | Auto-registers the native remote `chorus` MCP server from `chorus.json` or environment variables; `opencode.json` MCP config is a fallback. | Uses Codex runtime MCP configuration. | Uses that runtime's MCP configuration. |
+| Reviewer automation | `chorus_pm_submit_proposal` and `chorus_submit_for_verify` auto-launch read-only reviewer child sub-agents and wait for the current verdict or timeout. | Reviewer flow may be advisory or manually invoked by its runtime contract. | Reviewer flow follows that integration's hook and agent model. |
+| Session state | Plugin creates, heartbeats, reopens, and closes sessions; sub-agents receive injected session context. | Session behavior follows the Codex integration contract. | Session behavior follows that runtime integration contract. |
+| Hooks/events | Uses OpenCode plugin config, event, and `tool.execute.after` hooks. | Uses Codex runtime hooks or workflow entry points. | Uses that runtime's hook behavior. |
+| Notifications | `chorus_checkin` and notification tools expose recent Chorus notifications through MCP. | Depends on the Codex MCP/tool surface. | Depends on that runtime's MCP/tool surface. |
+
 ---
 
 ## Execution Rules

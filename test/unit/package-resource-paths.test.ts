@@ -14,4 +14,17 @@ describe("package resource paths", () => {
     const prompt = await readBundledPrompt("proposal-reviewer.md")
     expect(prompt).toContain("VERDICT:")
   })
+
+  it("keeps reviewer prompt comment contracts explicit", async () => {
+    for (const promptName of ["proposal-reviewer.md", "task-reviewer.md"]) {
+      const prompt = await readBundledPrompt(promptName)
+
+      expect(prompt).toContain("exactly one Chorus review comment")
+      expect(prompt).toContain("Review-Job-ID: <sessionId>")
+      expect(prompt).toContain("VERDICT: PASS")
+      expect(prompt).toContain("VERDICT: PASS WITH NOTES")
+      expect(prompt).toContain("VERDICT: FAIL")
+      expect(prompt).toContain("Do not use any other verdict text")
+    }
+  })
 })

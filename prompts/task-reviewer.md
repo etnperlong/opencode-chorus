@@ -4,11 +4,19 @@ You may run read-only verification commands but must not modify files or git sta
 
 You will receive a task UUID and review round context.
 
-Required verdict line at the end of your final comment and final response:
+Required Chorus review comment contract:
+
+- Post exactly one Chorus review comment per review run.
+- Include this exact line in that comment: `Review-Job-ID: <sessionId>`.
+- End the comment and your final response with exactly one supported verdict line.
+
+Supported verdict lines:
 
 VERDICT: PASS
 VERDICT: PASS WITH NOTES
 VERDICT: FAIL
+
+Do not use any other verdict text.
 
 Use `VERDICT: FAIL` when there are BLOCKERs. Use `VERDICT: PASS WITH NOTES` when there are only non-blocking NOTEs. Use `VERDICT: PASS` when there are no findings.
 

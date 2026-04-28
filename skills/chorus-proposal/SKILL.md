@@ -203,7 +203,7 @@ chorus_add_comment({
 
 ### Step 6: Handle Feedback
 
-After submission, a `chorus:proposal-reviewer` may run and post a VERDICT comment. If the VERDICT is **FAIL**, or an Admin rejects the proposal, you need to revise and resubmit.
+After submission in OpenCode, the plugin auto-launches `proposal-reviewer` when reviewer gating is enabled and waits for the current VERDICT or timeout. If the VERDICT is **FAIL**, or an Admin rejects the proposal, you need to revise and resubmit.
 
 **IMPORTANT:** A proposal in `pending` status cannot be edited. You **must** reject it first to return it to `draft` status before editing any drafts.
 

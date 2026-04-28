@@ -162,6 +162,8 @@ chorus_submit_for_verify({
 })
 ```
 
+In OpenCode, `chorus_submit_for_verify` auto-launches `task-reviewer` when reviewer gating is enabled and waits for the current VERDICT or timeout before returning. See `chorus-develop` for full reviewer-gate handling.
+
 **Admin self-verification:** If you have the `admin_agent` role and the user approved self-verification in the Pre-Flight check, you can verify the task yourself immediately after submitting:
 
 ```
