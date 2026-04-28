@@ -1,10 +1,8 @@
 import type { Config } from "@opencode-ai/plugin"
-import { fileURLToPath } from "node:url"
 import { createChorusRemoteMcpConfig } from "../chorus/mcp-config"
 import { applyReviewerAgentConfig } from "../reviewers/reviewer-agents"
+import { bundledSkillsDir } from "../util/package-resource-paths"
 import type { OpenCodeChorusConfig } from "./schema"
-
-const chorusSkillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 
 function normalizeSkillsPath(path: string): string {
   const normalized = path.replace(/[\\/]+$/, "")
@@ -27,13 +25,13 @@ export function createPluginConfigApplier(runtimeMcp?: RuntimeMcpInput) {
     configWithPluginState.skills = configWithPluginState.skills ?? {}
     configWithPluginState.skills.paths = configWithPluginState.skills.paths ?? []
 
-    const normalizedChorusSkillsDir = normalizeSkillsPath(chorusSkillsDir)
+    const normalizedChorusSkillsDir = normalizeSkillsPath(bundledSkillsDir)
     const hasBundledSkillsDir = configWithPluginState.skills.paths.some(
       (path) => normalizeSkillsPath(path) === normalizedChorusSkillsDir,
     )
 
     if (!hasBundledSkillsDir) {
-      configWithPluginState.skills.paths.push(chorusSkillsDir)
+      configWithPluginState.skills.paths.push(bundledSkillsDir)
     }
 
     if (runtimeMcp) {

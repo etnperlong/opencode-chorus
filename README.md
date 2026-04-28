@@ -4,6 +4,8 @@ OpenCode plugin for Chorus.
 
 ## Installation
 
+### Local development
+
 Install dependencies with Bun when using this repository directly:
 
 ```bash
@@ -19,7 +21,9 @@ import ChorusPlugin from "/absolute/path/to/opencode-chorus/src/index.ts"
 export const ChorusLocalPlugin = ChorusPlugin
 ```
 
-When published as an npm package, the intended OpenCode config is:
+### npm package
+
+Install `opencode-chorus` from npm, then enable it in OpenCode:
 
 ```json
 {
@@ -27,6 +31,8 @@ When published as an npm package, the intended OpenCode config is:
   "plugin": ["opencode-chorus"]
 }
 ```
+
+The published package includes the bundled Chorus `skills/` directory and reviewer `prompts/` files, so no extra wiring is required after installation.
 
 ## Configuration
 

@@ -1,5 +1,5 @@
-import { readFile } from "node:fs/promises"
 import type { Config } from "@opencode-ai/plugin"
+import { readBundledPrompt } from "../util/package-resource-paths"
 
 export const PROPOSAL_REVIEWER_AGENT = "proposal-reviewer"
 export const TASK_REVIEWER_AGENT = "task-reviewer"
@@ -8,8 +8,8 @@ export const TASK_REVIEWER_MAX_STEPS = 25
 
 export async function applyReviewerAgentConfig(config: Config): Promise<void> {
   const [proposalPrompt, taskPrompt] = await Promise.all([
-    readPrompt("proposal-reviewer.md"),
-    readPrompt("task-reviewer.md"),
+    readBundledPrompt("proposal-reviewer.md"),
+    readBundledPrompt("task-reviewer.md"),
   ])
 
   config.agent = {
@@ -41,8 +41,4 @@ export async function applyReviewerAgentConfig(config: Config): Promise<void> {
       },
     },
   }
-}
-
-async function readPrompt(name: string): Promise<string> {
-  return readFile(new URL(`../../prompts/${name}`, import.meta.url), "utf8")
 }
