@@ -1,29 +1,40 @@
 # opencode-chorus
 
-OpenCode plugin for Chorus.
+The official [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for OpenCode. 
 
-## Installation
+This plugin connects OpenCode to your Chorus instance, allowing you to seamlessly interact with the Chorus workflow, manage proposals, execute tasks, and run the full AI-DLC pipeline directly from your OpenCode environment.
 
-### Local development
+## What it does
 
-Install dependencies with Bun when using this repository directly:
+When enabled, `opencode-chorus` automatically registers a native Chorus MCP server inside OpenCode and injects the complete suite of Chorus workflow skills. You don't need to manually configure tools or link skill directories—the plugin handles the wiring.
 
-```bash
-bun install
-```
+The plugin provides lifecycle hooks, 7 distinct workflow skills, and 2 independent review agents to guide you through every stage of the AI-DLC process.
 
-Enable the plugin through OpenCode's normal plugin mechanisms. For local development, create a local wrapper plugin:
+### Features at a Glance
 
-```ts
-// ~/.config/opencode/plugins/chorus.ts
-import ChorusPlugin from "/absolute/path/to/opencode-chorus/src/index.ts"
+| Feature Category | Components | Description |
+|---|---|---|
+| **Lifecycle Hooks** | State Management | Keeps your OpenCode session state in sync with the `.chorus` directory. |
+| | Native MCP | Automatically registers the native Chorus MCP server. |
+| **Review Agents** | Proposal Reviewer | Automated review agent that evaluates proposals and waits for verdicts. |
+| | Task Reviewer | Automated review agent that verifies completed tasks. |
+| **Workflow Skills** | `chorus` | The entry point. Platform overview, shared tools, and lifecycle rules. |
+| | `chorus-idea` | Claim ideas, elaborate on requirements, and confirm with owners. |
+| | `chorus-proposal` | Draft PRDs, tech designs, and task dependency graphs. |
+| | `chorus-develop` | Implement tasks, report work, and run self-checks before verification. |
+| | `chorus-quick-dev` | Handle small changes and hotfixes with optional self-verification. |
+| | `chorus-review` | Handle reviewer verdicts, governance, and verification states. |
+| | `chorus-yolo` | Execute the full-auto AI-DLC pipeline from prompt to completion. |
 
-export const ChorusLocalPlugin = ChorusPlugin
-```
+> **Note**: You must have a valid Chorus instance (either local or online) running and accessible to use this plugin.
 
-### npm package
+## Getting Started
 
-Install `opencode-chorus` from npm, then enable it in OpenCode:
+### 1. Install the Plugin
+
+Install `opencode-chorus` from npm by adding it to your OpenCode configuration.
+
+Edit your OpenCode config file (usually `~/.config/opencode/config.json`) to include the plugin:
 
 ```json
 {
@@ -32,128 +43,30 @@ Install `opencode-chorus` from npm, then enable it in OpenCode:
 }
 ```
 
-The published package includes the bundled Chorus `skills/` directory and reviewer `prompts/` files, so no extra wiring is required after installation.
+### 2. Configure Credentials
 
-## Configuration
+The plugin needs to know where your Chorus server is and how to authenticate. The easiest way to configure this is using environment variables.
 
-Configure Chorus separately from OpenCode's `plugin` array. The plugin reads `chorus.json` from the OpenCode config directory and then applies environment variable overrides. When `chorusUrl` and `apiKey` are available, the plugin also auto-registers a native `chorus` remote MCP server in OpenCode. If either credential is missing, bundled skills and reviewer-agent config still load, but the native Chorus MCP server is not injected until OpenCode is restarted with valid credentials.
+Set these in your terminal before running OpenCode:
 
-Default config file path:
-
-```text
-~/.config/opencode/chorus.json
+```bash
+export CHORUS_BASE_URL="http://localhost:3000" # Replace with your Chorus server URL
+export CHORUS_API_KEY="your-chorus-api-key"
 ```
 
-If `OPENCODE_CONFIG_DIR` is set, the plugin reads:
-
-```text
-$OPENCODE_CONFIG_DIR/chorus.json
-```
-
-If `XDG_CONFIG_HOME` is set and `OPENCODE_CONFIG_DIR` is not, the plugin reads:
-
-```text
-$XDG_CONFIG_HOME/opencode/chorus.json
-```
-
-Example `chorus.json`:
+Alternatively, you can create a `chorus.json` file in your OpenCode configuration directory (`~/.config/opencode/chorus.json`):
 
 ```json
 {
   "chorusUrl": "http://localhost:3000",
   "enableProposalReviewer": true,
-  "enableTaskReviewer": true,
-  "maxProposalReviewRounds": 3,
-  "maxTaskReviewRounds": 3,
-  "stateDir": ".chorus",
-  "sharedStateMode": "compatible"
+  "enableTaskReviewer": true
 }
 ```
+*Note: While you can put your API key in `chorus.json`, using the `CHORUS_API_KEY` environment variable is strongly recommended for security.*
 
-Set the API key through the environment when possible:
+### 3. Restart OpenCode
 
-```bash
-export CHORUS_API_KEY="your-chorus-api-key"
-```
+After installing the plugin and setting your credentials, restart OpenCode.
 
-The plugin also supports `apiKey` in `chorus.json`, but it logs a warning recommending `CHORUS_API_KEY` because API keys are secrets.
-
-Supported environment variables:
-
-- `CHORUS_BASE_URL`: Chorus server base URL, for example `http://localhost:3000`
-- `CHORUS_URL`: fallback alias for `CHORUS_BASE_URL`
-- `CHORUS_API_KEY`: Chorus API key
-- `CHORUS_PROJECT_UUIDS`: comma-separated project UUIDs
-- `CHORUS_STATE_DIR`: local state directory, default `.chorus`
-- `CHORUS_SHARED_STATE_MODE`: `compatible` or `isolated`
-- `CHORUS_AUTO_START`: `true`, `false`, `1`, or `0`
-- `CHORUS_ENABLE_PROPOSAL_REVIEWER`: `true`, `false`, `1`, or `0`
-- `CHORUS_ENABLE_TASK_REVIEWER`: `true`, `false`, `1`, or `0`
-- `CHORUS_MAX_PROPOSAL_REVIEW_ROUNDS`: positive integer
-- `CHORUS_MAX_TASK_REVIEW_ROUNDS`: positive integer
-- `CHORUS_REVIEWER_WAIT_TIMEOUT_MS`: max milliseconds to wait for automatic reviewer verdicts, default `300000`
-- `CHORUS_REVIEWER_POLL_INTERVAL_MS`: milliseconds between reviewer verdict polls, default `1000`
-
-Configuration precedence is:
-
-```text
-defaults < chorus.json < environment variables < explicit plugin options
-```
-
-## Features
-
-- native Chorus MCP auto-registration in OpenCode
-- `.chorus` compatibility with isolated OpenCode state
-- proposal planning scope
-- automated proposal and task reviewer comments with review-state persistence
-- strict proposal/task reviewer gating that waits for a verdict before the triggering workflow continues
-- Chorus notification routing
-
-## State Layout
-
-The plugin writes:
-
-- `.chorus/opencode-state.json`
-- `.chorus/shared.json`
-- `.chorus/sessions/*.json`
-
-The plugin does not use `.chorus/state.json` as its primary writable state file.
-
-Compatibility files under `.chorus/` allow Chorus sessions, shared project metadata, planning scope, and review routing to work across tools while keeping OpenCode-specific lifecycle state isolated.
-
-## Manual Verification
-
-These steps require a running Chorus development server and valid Chorus credentials. Local verification only covers tests and typechecking; live OpenCode plugin loading, Chorus connectivity, SSE routing, and reviewer comment posting must be run separately against a real Chorus server.
-
-1. Load the plugin in OpenCode with valid `chorusUrl` and `apiKey`, then restart OpenCode after any credential change
-2. Confirm the native `chorus` MCP server appears in OpenCode's MCP list
-3. Confirm `.chorus/opencode-state.json` is created
-4. Confirm `.chorus/sessions/main.json` appears after session start
-5. Use the native Chorus MCP tool surface to run `chorus_checkin`, then run `chorus_get_task` with a valid `taskUuid` from the current project
-6. Complete a native proposal flow ending with `chorus_pm_submit_proposal` and verify a proposal review comment is posted
-7. Complete a native task verification flow ending with `chorus_submit_for_verify` and verify a task review comment is posted
-8. Seed or create a running worker record, restart the session, and confirm it is marked `aborted` with `finishedAt` in `.chorus/opencode-state.json`
-
-## Skills
-
-This package includes OpenCode skill prompts for the Chorus workflow. When the plugin loads, it auto-registers the bundled `skills/` directory with OpenCode's native skill discovery, so no manual symlinks or manual `skills.paths` entries are required for these bundled skills.
-
-Bundled skills are adapted from Chorus's plugin-embedded skill set and use OpenCode-compatible `SKILL.md` YAML frontmatter for metadata. OpenCode does not require per-skill `package.json` files for Agent Skills, so this package keeps metadata in the fields OpenCode documents: `name`, `description`, `license`, `compatibility`, and `metadata`.
-
-The stage-specific skills use a `chorus-` prefix so users can manage them with OpenCode skill permission patterns such as `chorus-*` without affecting unrelated workflow skills.
-
-- `skills/chorus/SKILL.md`: platform overview, shared tools, setup, lifecycle rules, and skill routing
-- `skills/chorus-idea/SKILL.md`: idea claiming, elaboration, requirements clarification, and owner confirmation
-- `skills/chorus-proposal/SKILL.md`: proposal planning, PRD and tech design drafts, task drafts, acceptance criteria, and dependency DAGs
-- `skills/chorus-develop/SKILL.md`: approved task implementation, work reporting, self-checks, subagent attribution, and verification submission
-- `skills/chorus-quick-dev/SKILL.md`: small approved changes, quick tasks, hotfixes, and optional admin self-verification
-- `skills/chorus-review/SKILL.md`: proposal approval/rejection, task verification, reviewer verdict handling, and governance
-- `skills/chorus-yolo/SKILL.md`: full-auto AI-DLC pipeline from prompt to completion with reviewer loops and wave-based execution
-
-Use the stage-specific skill that matches the current Chorus workflow stage.
-
-If the Chorus skills do not appear in `/skills`:
-
-1. Confirm the plugin is enabled and loaded by OpenCode.
-2. Restart OpenCode after enabling or updating the plugin.
-3. Confirm the bundled `SKILL.md` files still contain valid `name` and `description` frontmatter.
+Once restarted, you should see the Chorus skills available in your workspace. You can start by asking OpenCode to use the `chorus` skill to get an overview, or dive right into a specific stage like `chorus-idea` or `chorus-yolo`.
