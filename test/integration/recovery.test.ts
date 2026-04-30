@@ -46,7 +46,7 @@ describe("recovery", () => {
     expect(completedWorker.status).toBe("completed")
   })
 
-  it("marks in-progress reviews as changes requested during recovery", async () => {
+  it("marks in-progress reviews as interrupted during recovery", async () => {
     const stateStore = await createTestStateStore()
     await stateStore.updateOpenCodeState((state) => ({
       ...state,
@@ -72,7 +72,9 @@ describe("recovery", () => {
     const currentReview = state.reviews.current
     const approvedReview = state.reviews.approved
     if (!currentReview || !approvedReview) throw new Error("Expected recovery reviews to exist")
-    expect(currentReview.status).toBe("changes-requested")
+    expect(currentReview.status).toBe("interrupted")
+    expect(currentReview.lastGateStatus).toBe("interrupted")
+    expect(currentReview.lastGateMessage).toBe("Reviewer session was interrupted before posting a verdict")
     expect(approvedReview.status).toBe("approved")
   })
 })

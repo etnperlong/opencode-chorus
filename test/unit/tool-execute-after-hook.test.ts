@@ -14,6 +14,7 @@ describe("tool.execute.after hook", () => {
         maxTaskReviewRounds: 3,
         reviewerWaitTimeoutMs: 300000,
         reviewerPollIntervalMs: 1000,
+        reviewGateOutputMode: "summary",
       },
       stateStore: {
         paths: { stateFile: ".chorus/opencode-state.json" },

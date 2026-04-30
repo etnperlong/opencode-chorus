@@ -15,6 +15,8 @@ describe("review sync", () => {
 
     expect(review.status).toBe("escalated")
     expect(state.reviews["task:task-1"]?.status).toBe("escalated")
+    expect(state.reviews["task:task-1"]?.lastGateStatus).toBe("escalated")
+    expect(state.reviews["task:task-1"]?.lastGateMessage).toBe("Maximum reviewer rounds exceeded; escalate for human review")
   })
 
   it("clears stale verdict and review job id when starting a new active round", async () => {

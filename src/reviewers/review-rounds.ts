@@ -4,13 +4,16 @@ export function nextReviewRound(state: OpenCodeState, targetKey: string, maxRoun
   const existing = state.reviews[targetKey]
   const currentRound = (existing?.currentRound ?? 0) + 1
   const status = currentRound > maxRounds ? "escalated" : "reviewing"
+  const isEscalated = status === "escalated"
 
   return {
     currentRound,
     maxRounds,
     status,
-    lastVerdict: status === "escalated" ? existing?.lastVerdict : undefined,
-    lastReviewJobId: status === "escalated" ? existing?.lastReviewJobId : undefined,
+    lastVerdict: isEscalated ? existing?.lastVerdict : undefined,
+    lastReviewJobId: isEscalated ? existing?.lastReviewJobId : undefined,
+    lastGateStatus: isEscalated ? "escalated" : undefined,
+    lastGateMessage: isEscalated ? "Maximum reviewer rounds exceeded; escalate for human review" : undefined,
     blockersSnapshot: existing?.blockersSnapshot ?? [],
   }
 }

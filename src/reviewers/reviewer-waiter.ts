@@ -2,9 +2,9 @@ import type { ChorusMcpClient } from "../chorus/mcp-client"
 import type { StateStore } from "../state/state-store"
 import type { ReviewRecord } from "../state/state-types"
 import { parseVerdict, type ReviewVerdict } from "./review-parser"
-import { persistReviewVerdict } from "./review-sync"
+import { persistReviewTimeout, persistReviewVerdict } from "./review-sync"
 
-export type ReviewerWaitResult = { status: "completed"; verdict: ReviewVerdict } | { status: "timeout" }
+export type ReviewerWaitResult = { status: "completed"; verdict: ReviewVerdict } | { status: "timeout" } | { status: "escalated" }
 
 type ReviewerWaitOptions = {
   client: Pick<ChorusMcpClient, "callTool">
@@ -26,13 +26,13 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
     if (persistedVerdict) return { status: "completed", verdict: persistedVerdict }
 
     const remainingMs = deadline - Date.now()
-    if (remainingMs <= 0) return { status: "timeout" }
+    if (remainingMs <= 0) return timeoutResult(options)
 
     const result = await callToolWithTimeout(options.client, remainingMs, "chorus_get_comments", {
       targetType: options.targetType,
       targetUuid: options.targetUuid,
     })
-    if (result.status === "timeout") return { status: "timeout" }
+    if (result.status === "timeout") return timeoutResult(options)
 
     for (const content of extractCommentContents(result.value)) {
       if (options.reviewJobId && !hasReviewJobMarker(content, options.reviewJobId)) continue
@@ -49,9 +49,18 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
       return { status: "completed", verdict }
     }
 
-    if (Date.now() >= deadline) return { status: "timeout" }
+    if (Date.now() >= deadline) return timeoutResult(options)
     await sleep(Math.min(Math.max(options.pollIntervalMs, 0), Math.max(deadline - Date.now(), 0)))
   }
+}
+
+async function timeoutResult(options: ReviewerWaitOptions): Promise<ReviewerWaitResult> {
+  await persistReviewTimeout(
+    options.stateStore,
+    options.targetKey,
+    options.reviewJobId ? { expectedReviewJobId: options.reviewJobId } : {},
+  )
+  return { status: "timeout" }
 }
 
 function hasReviewJobMarker(content: string, reviewJobId: string): boolean {

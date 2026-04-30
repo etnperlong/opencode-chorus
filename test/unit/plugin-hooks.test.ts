@@ -18,7 +18,14 @@ mock.module("../../src/chorus/mcp-client", () => ({
   ChorusMcpClient: class {
     async callTool(name: string, args: Record<string, unknown> = {}) {
       toolCalls.push({ name, args })
-      if (name === "chorus_checkin") return { session: { uuid: "chorus-session-1" } }
+      if (name === "chorus_checkin") {
+        return {
+          session: { uuid: "chorus-session-1" },
+          agent: { uuid: "agent-1", name: "OpenCode", roles: ["developer"] },
+          projects: [{ uuid: "project-1", name: "OpenCode-Chorus", taskCount: 2, pendingProposalCount: 1 }],
+          notifications: [{ uuid: "notification-1" }],
+        }
+      }
       if (name === "chorus_get_comments") return getCommentsResponse
       return {}
     }
@@ -70,6 +77,55 @@ describe("plugin hooks", () => {
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never)
 
       expect(toolCalls.map((call) => call.name)).not.toContain("chorus_checkin")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("surfaces compact Chorus context on startup when enabled", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableSessionContextSummary: true,
+      })
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-context" } } } } as never)
+      await plugin.event?.({ event: { type: "session.idle", properties: { info: { id: "session-context" } } } } as never)
+
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "info",
+          message: "Chorus context: OpenCode connected; 1 unread notification; OpenCode-Chorus has 2 tasks and 1 pending proposal.",
+        }),
+      )
+      expect(logCalls.filter((call) => call.message?.startsWith("Chorus context:"))).toHaveLength(1)
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("stores compact context without surfacing it when disabled", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableSessionContextSummary: false,
+      })
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-context" } } } } as never)
+
+      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
+      expect(state.sessionContext).toMatchObject({
+        source: "chorus_checkin",
+        runtimeSessionId: "session-context",
+        projects: [{ uuid: "project-1", name: "OpenCode-Chorus" }],
+      })
+      expect(logCalls.some((call) => call.message?.startsWith("Chorus context:"))).toBe(false)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -130,6 +186,11 @@ describe("plugin hooks", () => {
         agent: "proposal-reviewer",
         reviewStatus: "completed",
         verdict: "PASS",
+        reviewJobId: "review-session-1",
+        reviewRound: 1,
+        reviewMaxRounds: 3,
+        reviewGateOutputMode: "summary",
+        reviewNextAction: "Proceed to proposal approval.",
       })
       expect(output.output).toContain('"reviewer"')
       expect(output.output).toContain('"verdict": "PASS"')
@@ -221,6 +282,11 @@ describe("plugin hooks", () => {
         agent: "task-reviewer",
         reviewStatus: "completed",
         verdict: "FAIL",
+        reviewJobId: "review-session-1",
+        reviewRound: 1,
+        reviewMaxRounds: 3,
+        reviewGateOutputMode: "summary",
+        reviewNextAction: "Fix reviewer BLOCKERs, then resubmit for verification.",
       })
       expect(output.output).toContain('"reviewer"')
       expect(output.output).toContain('"verdict": "FAIL"')
@@ -262,6 +328,11 @@ describe("plugin hooks", () => {
         taskId: "review-session-1",
         agent: "task-reviewer",
         reviewStatus: "timeout",
+        reviewJobId: "review-session-1",
+        reviewRound: 1,
+        reviewMaxRounds: 3,
+        reviewGateOutputMode: "summary",
+        reviewNextAction: "Inspect reviewer session review-session-1 or task comments, then retry the reviewer gate or escalate.",
       })
       expect(output.output).toContain("Reviewer did not finish before timeout")
     } finally {
@@ -297,6 +368,57 @@ describe("plugin hooks", () => {
           body: expect.objectContaining({ agent: "task-reviewer" }),
         }),
       })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("annotates escalated reviewer gates without dispatching another reviewer", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        maxTaskReviewRounds: 1,
+      })
+      const statePath = join(rootDir, ".chorus", "opencode-state.json")
+      const state = JSON.parse(await readFile(statePath, "utf8"))
+      state.reviews["task:task-escalated"] = {
+        currentRound: 1,
+        maxRounds: 1,
+        status: "changes-requested",
+        lastVerdict: "FAIL",
+        lastReviewJobId: "review-session-previous",
+        blockersSnapshot: [],
+      }
+      await writeFile(statePath, JSON.stringify(state, null, 2))
+
+      const output: { title: string; output: string; metadata: unknown } = {
+        title: "",
+        output: JSON.stringify({ submitted: true }),
+        metadata: {},
+      }
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_submit_for_verify",
+          args: { taskUuid: "task-escalated" },
+          sessionID: "session-1",
+        } as never,
+        output as never,
+      )
+
+      expect(sessionCalls.map((call) => call.name)).not.toContain("create")
+      expect(output.metadata).toMatchObject({
+        reviewStatus: "escalated",
+        reviewJobId: "review-session-previous",
+        reviewRound: 2,
+        reviewMaxRounds: 1,
+        reviewNextAction: "Escalate for human review before retrying this gate.",
+      })
+      expect(JSON.parse(output.output).reviewer.status).toBe("escalated")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -371,7 +493,7 @@ describe("plugin hooks", () => {
       )
 
       const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
-      expect(state.reviews["task:task-active"].status).toBe("reviewing")
+      expect(state.reviews["task:task-active"].status).toBe("timed-out")
       expect(state.reviews["task:task-active"].lastVerdict).toBeUndefined()
       expect(state.reviews["task:task-active"].lastReviewJobId).toBe("review-session-1")
     } finally {

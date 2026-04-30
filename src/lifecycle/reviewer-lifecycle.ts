@@ -6,7 +6,14 @@ export async function markInterruptedReviews(stateStore: StateStore) {
     reviews: Object.fromEntries(
       Object.entries(state.reviews).map(([key, value]) => [
         key,
-        value.status === "reviewing" ? { ...value, status: "changes-requested" } : value,
+        value.status === "reviewing"
+          ? {
+              ...value,
+              status: "interrupted",
+              lastGateStatus: "interrupted",
+              lastGateMessage: "Reviewer session was interrupted before posting a verdict",
+            }
+          : value,
       ]),
     ),
   }))

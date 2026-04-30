@@ -33,6 +33,7 @@ type CreateToolExecuteAfterHookOptions = {
     | "maxTaskReviewRounds"
     | "reviewerWaitTimeoutMs"
     | "reviewerPollIntervalMs"
+    | "reviewGateOutputMode"
   >
   stateStore: StateStore
   planningLifecycle: PlanningLifecycle
@@ -95,7 +96,17 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
 
       const targetKey = `proposal:${proposalUuid}`
       const review = await beginReviewRound(options.stateStore, targetKey, options.config.maxProposalReviewRounds)
-      if (review?.status === "escalated") return
+      if (review?.status === "escalated") {
+        attachReviewerGateResult(output, { status: "escalated" }, review.lastReviewJobId ?? "unavailable", {
+          round: review.currentRound,
+          maxRounds: review.maxRounds,
+          mode: options.config.reviewGateOutputMode,
+          targetType: "proposal",
+          targetUuid: proposalUuid,
+          commentToolName: "chorus_get_comments",
+        })
+        return
+      }
 
       const reviewJobId = await dispatchProposalReviewer({
         client: options.context.client,
@@ -123,7 +134,14 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
       })
-      attachReviewerGateResult(output, waitResult, reviewJobId)
+      attachReviewerGateResult(output, waitResult, reviewJobId, {
+        round: review.currentRound,
+        maxRounds: review.maxRounds,
+        mode: options.config.reviewGateOutputMode,
+        targetType: "proposal",
+        targetUuid: proposalUuid,
+        commentToolName: "chorus_get_comments",
+      })
     }
 
     if (tool === "chorus_submit_for_verify" && options.config.enableTaskReviewer) {
@@ -132,7 +150,17 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
 
       const targetKey = `task:${taskUuid}`
       const review = await beginReviewRound(options.stateStore, targetKey, options.config.maxTaskReviewRounds)
-      if (review?.status === "escalated") return
+      if (review?.status === "escalated") {
+        attachReviewerGateResult(output, { status: "escalated" }, review.lastReviewJobId ?? "unavailable", {
+          round: review.currentRound,
+          maxRounds: review.maxRounds,
+          mode: options.config.reviewGateOutputMode,
+          targetType: "task",
+          targetUuid: taskUuid,
+          commentToolName: "chorus_get_comments",
+        })
+        return
+      }
 
       const reviewJobId = await dispatchTaskReviewer({
         client: options.context.client,
@@ -160,7 +188,14 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
       })
-      attachReviewerGateResult(output, waitResult, reviewJobId)
+      attachReviewerGateResult(output, waitResult, reviewJobId, {
+        round: review.currentRound,
+        maxRounds: review.maxRounds,
+        mode: options.config.reviewGateOutputMode,
+        targetType: "task",
+        targetUuid: taskUuid,
+        commentToolName: "chorus_get_comments",
+      })
     }
   }
 }

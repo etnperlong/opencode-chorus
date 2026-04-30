@@ -60,6 +60,32 @@ describe("waitForReviewerVerdict", () => {
     expect(result).toEqual({ status: "timeout" })
   })
 
+  it("persists timeout recovery details in review state", async () => {
+    const store = await createStore()
+    await persistReview(store, "task:task-timeout", undefined, "reviewing", "review-timeout-job")
+    const client = new FakeMcpClient([{ comments: [] }])
+
+    const result = await waitForReviewerVerdict({
+      client,
+      stateStore: store,
+      targetKey: "task:task-timeout",
+      targetType: "task",
+      targetUuid: "task-timeout",
+      timeoutMs: 1,
+      pollIntervalMs: 1,
+      reviewJobId: "review-timeout-job",
+    })
+    const state = await store.readOpenCodeState()
+
+    expect(result).toEqual({ status: "timeout" })
+    expect(state.reviews["task:task-timeout"]).toMatchObject({
+      status: "timed-out",
+      lastReviewJobId: "review-timeout-job",
+      lastGateStatus: "timeout",
+      lastGateMessage: "Reviewer did not finish before timeout",
+    })
+  })
+
   it("returns and persists a verdict found in Chorus comments", async () => {
     const store = await createStore()
     const client = new FakeMcpClient([{ comments: [{ content: "Looks good\nVERDICT: PASS WITH NOTES" }] }])

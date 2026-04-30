@@ -48,7 +48,40 @@ export async function persistReviewVerdict(
           status: verdict === "FAIL" ? "changes-requested" : "approved",
           lastVerdict: verdict,
           lastReviewJobId: existing?.lastReviewJobId,
+          lastGateStatus: "completed",
+          lastGateMessage: `Reviewer completed with verdict ${verdict}`,
           blockersSnapshot: existing?.blockersSnapshot ?? [],
+        },
+      },
+    }
+  })
+
+  return persisted
+}
+
+export async function persistReviewTimeout(
+  stateStore: StateStore,
+  targetKey: string,
+  options: { expectedReviewJobId?: string } = {},
+): Promise<boolean> {
+  let persisted = false
+
+  await stateStore.updateOpenCodeState((state) => {
+    const existing = state.reviews[targetKey]
+    if (!existing || existing.status !== "reviewing") return state
+    if (options.expectedReviewJobId && existing.lastReviewJobId !== options.expectedReviewJobId) return state
+
+    persisted = true
+
+    return {
+      ...state,
+      reviews: {
+        ...state.reviews,
+        [targetKey]: {
+          ...existing,
+          status: "timed-out",
+          lastGateStatus: "timeout",
+          lastGateMessage: "Reviewer did not finish before timeout",
         },
       },
     }
