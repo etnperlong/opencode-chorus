@@ -4,7 +4,12 @@ import type { ReviewRecord } from "../state/state-types"
 import { parseVerdict, type ReviewVerdict } from "./review-parser"
 import { persistReviewTimeout, persistReviewVerdict } from "./review-sync"
 
-export type ReviewerWaitResult = { status: "completed"; verdict: ReviewVerdict } | { status: "timeout" } | { status: "escalated" }
+export type ReviewerWaitResult =
+  | { status: "completed"; verdict: ReviewVerdict; comment?: string }
+  | { status: "running"; message: string }
+  | { status: "timeout"; message?: string }
+  | { status: "escalated"; message?: string }
+  | { status: "interrupted"; message: string }
 
 type ReviewerWaitOptions = {
   client: Pick<ChorusMcpClient, "callTool">
@@ -23,7 +28,7 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
   while (true) {
     const state = await options.stateStore.readOpenCodeState()
     const persistedVerdict = readStateVerdict(state.reviews[options.targetKey])
-    if (persistedVerdict) return { status: "completed", verdict: persistedVerdict }
+    if (persistedVerdict) return { status: "completed", ...persistedVerdict }
 
     const remainingMs = deadline - Date.now()
     if (remainingMs <= 0) return timeoutResult(options)
@@ -43,10 +48,13 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
         options.stateStore,
         options.targetKey,
         verdict,
-        options.reviewJobId ? { expectedReviewJobId: options.reviewJobId } : {},
+        {
+          ...(options.reviewJobId ? { expectedReviewJobId: options.reviewJobId } : {}),
+          reviewerComment: content,
+        },
       )
       if (!persisted) continue
-      return { status: "completed", verdict }
+      return { status: "completed", verdict, comment: content }
     }
 
     if (Date.now() >= deadline) return timeoutResult(options)
@@ -68,9 +76,12 @@ function hasReviewJobMarker(content: string, reviewJobId: string): boolean {
   return content.split(/\r?\n/).some((line) => line.trim() === marker)
 }
 
-function readStateVerdict(review: ReviewRecord | undefined): ReviewVerdict | undefined {
+function readStateVerdict(review: ReviewRecord | undefined):
+  | { verdict: ReviewVerdict; comment?: string }
+  | undefined {
   if (review?.status !== "approved" && review?.status !== "changes-requested") return undefined
-  return review.lastVerdict
+  if (!review.lastVerdict) return undefined
+  return { verdict: review.lastVerdict, comment: review.lastReviewerComment }
 }
 
 async function callToolWithTimeout(

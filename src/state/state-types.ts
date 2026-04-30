@@ -38,6 +38,8 @@ export type ReviewRecord = {
   status: "idle" | "reviewing" | "changes-requested" | "approved" | "escalated" | "timed-out" | "interrupted"
   lastVerdict?: "PASS" | "PASS_WITH_NOTES" | "FAIL"
   lastReviewJobId?: string
+  lastReviewerComment?: string
+  lastTargetSignature?: string
   lastGateStatus?: "completed" | "timeout" | "escalated" | "interrupted"
   lastGateMessage?: string
   blockersSnapshot: string[]

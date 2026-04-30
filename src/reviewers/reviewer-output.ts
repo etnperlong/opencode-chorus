@@ -52,8 +52,21 @@ export function attachReviewerGateResult(
     ...(options.maxRounds !== undefined ? { maxRounds: options.maxRounds } : {}),
     nextAction,
     ...(waitResult.status === "completed"
-      ? { verdict: waitResult.verdict }
-      : { message: waitResult.status === "timeout" ? "Reviewer did not finish before timeout" : "Reviewer gate escalated" }),
+      ? {
+          verdict: waitResult.verdict,
+          ...(waitResult.comment ? { comment: waitResult.comment } : {}),
+        }
+      : {
+          message:
+            waitResult.message ??
+            (waitResult.status === "timeout"
+              ? "Reviewer did not finish before timeout"
+              : waitResult.status === "running"
+                ? "Reviewer is still running"
+                : waitResult.status === "interrupted"
+                  ? "Reviewer gate was interrupted"
+                  : "Reviewer gate escalated"),
+        }),
     ...(mode === "detailed" ? { details: reviewerDetails(waitResult, reviewJobId, options) } : {}),
   }
   const parsedOutput = parseJsonObject(output.output)
@@ -67,6 +80,8 @@ export function attachReviewerGateResult(
 
 function reviewerNextAction(waitResult: ReviewerWaitResult, reviewJobId: string, targetType: "proposal" | "task" = "task"): string {
   if (waitResult.status === "escalated") return "Escalate for human review before retrying this gate."
+  if (waitResult.status === "interrupted") return "Restore target snapshot access, then retry this reviewer gate."
+  if (waitResult.status === "running") return `Wait for reviewer session ${reviewJobId} to finish before retrying this gate.`
   if (waitResult.status === "timeout") {
     return `Inspect reviewer session ${reviewJobId} or ${targetType} comments, then retry the reviewer gate or escalate.`
   }
@@ -90,6 +105,8 @@ function reviewerDetails(
     ...(options.maxRounds !== undefined ? { maxRounds: options.maxRounds } : {}),
     status: waitResult.status,
     ...(waitResult.status === "completed" ? { verdict: waitResult.verdict } : {}),
+    ...(waitResult.status === "completed" && waitResult.comment ? { comment: waitResult.comment } : {}),
+    ...(waitResult.status !== "completed" && waitResult.message ? { message: waitResult.message } : {}),
     ...(options.targetType ? { targetType: options.targetType } : {}),
     ...(options.targetUuid ? { targetUuid: options.targetUuid } : {}),
     ...(options.commentToolName ? { commentToolName: options.commentToolName } : {}),
@@ -109,10 +126,21 @@ function formatReviewerResult(
     "Reviewer gate details:",
     `Job: ${reviewJobId}`,
     `Round: ${options.round ?? "unknown"}/${options.maxRounds ?? "unknown"}`,
-    `Status: ${waitResult.status}`,
-    ...(waitResult.status === "completed"
-      ? [`Verdict: ${waitResult.verdict}`]
-      : [`Message: ${waitResult.status === "timeout" ? "Reviewer did not finish before timeout" : "Reviewer gate escalated"}`]),
+      `Status: ${waitResult.status}`,
+      ...(waitResult.status === "completed"
+        ? [`Verdict: ${waitResult.verdict}`]
+        : [
+            `Message: ${
+              waitResult.message ??
+              (waitResult.status === "timeout"
+                ? "Reviewer did not finish before timeout"
+                : waitResult.status === "running"
+                  ? "Reviewer is still running"
+                  : waitResult.status === "interrupted"
+                    ? "Reviewer gate was interrupted"
+                    : "Reviewer gate escalated")
+            }`,
+          ]),
     ...(options.targetType && options.targetUuid ? [`Target: ${options.targetType} ${options.targetUuid}`] : []),
     ...(options.commentToolName ? [`Comments: ${options.commentToolName}`] : []),
     `Next action: ${reviewer.nextAction}`,

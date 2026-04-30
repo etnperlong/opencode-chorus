@@ -101,8 +101,13 @@ describe("waitForReviewerVerdict", () => {
     })
     const state = await store.readOpenCodeState()
 
-    expect(result).toEqual({ status: "completed", verdict: "PASS_WITH_NOTES" })
+    expect(result).toEqual({
+      status: "completed",
+      verdict: "PASS_WITH_NOTES",
+      comment: "Looks good\nVERDICT: PASS WITH NOTES",
+    })
     expect(state.reviews["task:task-1"]?.lastVerdict).toBe("PASS_WITH_NOTES")
+    expect(state.reviews["task:task-1"]?.lastReviewerComment).toBe("Looks good\nVERDICT: PASS WITH NOTES")
     expect(client.calls).toEqual([
       { name: "chorus_get_comments", args: { targetType: "task", targetUuid: "task-1" } },
     ])
@@ -131,7 +136,11 @@ describe("waitForReviewerVerdict", () => {
       reviewJobId: "review-session-2",
     })
 
-    expect(result).toEqual({ status: "completed", verdict: "FAIL" })
+    expect(result).toEqual({
+      status: "completed",
+      verdict: "FAIL",
+      comment: "Current review\nReview-Job-ID: review-session-2\nVERDICT: FAIL",
+    })
   })
 
   it("times out when only unmarked old verdicts exist for a current review job", async () => {
@@ -176,7 +185,11 @@ describe("waitForReviewerVerdict", () => {
       reviewJobId: "review-session-current",
     })
 
-    expect(result).toEqual({ status: "completed", verdict: "FAIL" })
+    expect(result).toEqual({
+      status: "completed",
+      verdict: "FAIL",
+      comment: "Review-Job-ID: review-session-current\nVERDICT: FAIL",
+    })
   })
 
   it("does not complete when a marked old comment no longer matches the current review job", async () => {
@@ -241,7 +254,11 @@ describe("waitForReviewerVerdict", () => {
       pollIntervalMs: 1,
     })
 
-    expect(result).toEqual({ status: "completed", verdict: "FAIL" })
+    expect(result).toEqual({
+      status: "completed",
+      verdict: "FAIL",
+      comment: "Changes are needed\nVERDICT: FAIL",
+    })
   })
 })
 

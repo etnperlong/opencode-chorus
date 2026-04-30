@@ -3,11 +3,16 @@ import type { ReviewRecord } from "../state/state-types"
 import type { ReviewVerdict } from "./review-parser"
 import { nextReviewRound } from "./review-rounds"
 
-export async function beginReviewRound(stateStore: StateStore, targetKey: string, maxRounds: number): Promise<ReviewRecord> {
+export async function beginReviewRound(
+  stateStore: StateStore,
+  targetKey: string,
+  maxRounds: number,
+  targetSignature?: string,
+): Promise<ReviewRecord> {
   let nextReview: ReviewRecord | undefined
 
   await stateStore.updateOpenCodeState((state) => {
-    const review = nextReviewRound(state, targetKey, maxRounds)
+    const review = nextReviewRound(state, targetKey, maxRounds, targetSignature)
     nextReview = review
 
     return {
@@ -27,7 +32,7 @@ export async function persistReviewVerdict(
   stateStore: StateStore,
   targetKey: string,
   verdict: ReviewVerdict,
-  options: { expectedReviewJobId?: string } = {},
+  options: { expectedReviewJobId?: string; reviewerComment?: string } = {},
 ): Promise<boolean> {
   let persisted = false
 
@@ -48,6 +53,8 @@ export async function persistReviewVerdict(
           status: verdict === "FAIL" ? "changes-requested" : "approved",
           lastVerdict: verdict,
           lastReviewJobId: existing?.lastReviewJobId,
+          lastReviewerComment: options.reviewerComment ?? existing?.lastReviewerComment,
+          lastTargetSignature: existing?.lastTargetSignature,
           lastGateStatus: "completed",
           lastGateMessage: `Reviewer completed with verdict ${verdict}`,
           blockersSnapshot: existing?.blockersSnapshot ?? [],
