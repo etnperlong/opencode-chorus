@@ -4,6 +4,10 @@ The [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for Open
 
 This plugin connects OpenCode to your Chorus instance, letting you manage proposals, execute tasks, and run the AI-DLC pipeline.
 
+## Changelog
+
+Release notes are tracked in [CHANGELOG.md](./CHANGELOG.md).
+
 ## Features
 
 When enabled, `opencode-chorus` registers a Chorus MCP server inside OpenCode and loads Chorus workflow skills. You don't need to configure tools or link skill directories manually.
