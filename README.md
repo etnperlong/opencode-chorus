@@ -54,16 +54,35 @@ export CHORUS_BASE_URL="http://localhost:3000" # Replace with your Chorus server
 export CHORUS_API_KEY="your-chorus-api-key"
 ```
 
+Optional observability settings:
+
+```bash
+export CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY="true"
+export CHORUS_ENABLE_NOTIFICATION_HINTS="true"
+export CHORUS_REVIEW_GATE_OUTPUT_MODE="summary" # summary or detailed
+```
+
 Alternatively, you can create a `chorus.json` file in your OpenCode configuration directory (`~/.config/opencode/chorus.json`):
 
 ```json
 {
   "chorusUrl": "http://localhost:3000",
   "enableProposalReviewer": true,
-  "enableTaskReviewer": true
+  "enableTaskReviewer": true,
+  "enableSessionContextSummary": true,
+  "enableNotificationHints": true,
+  "reviewGateOutputMode": "summary"
 }
 ```
 *Note: While you can put your API key in `chorus.json`, using the `CHORUS_API_KEY` environment variable is strongly recommended for security.*
+
+Observability behavior:
+
+- `enableSessionContextSummary` controls one concise startup/resume Chorus context summary. When disabled, context is still stored locally for recovery, but no proactive summary is shown.
+- `enableNotificationHints` controls actionable text on routed notification queue entries. When disabled, supported notifications are still queued without hint text.
+- `reviewGateOutputMode` controls reviewer gate output verbosity. `summary` keeps output concise; `detailed` includes expanded reviewer job, round, target, comment, timeout, escalation, and verdict details.
+
+These settings only control visibility and hints. They do not auto-claim tasks, approve proposals, or verify tasks.
 
 ### 3. Restart OpenCode
 

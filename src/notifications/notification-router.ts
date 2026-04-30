@@ -11,6 +11,7 @@ export type RoutedNotification =
       entityUuid: string
       projectUuid?: string
       message: string
+      actionHint?: string
     }
   | {
       kind: "ignored"
@@ -19,13 +20,21 @@ export type RoutedNotification =
       message: ""
     }
 
-export function routeNotification(input: NotificationInput): RoutedNotification {
+type RouteNotificationOptions = {
+  enableNotificationHints?: boolean
+}
+
+export function routeNotification(input: NotificationInput, options: RouteNotificationOptions = {}): RoutedNotification {
   if (input.action === "task_assigned" && input.entityUuid) {
     return {
       kind: "task_assigned",
       entityUuid: input.entityUuid,
       projectUuid: input.projectUuid,
       message: `[Chorus] Task assigned: ${input.entityTitle ?? input.entityUuid}`,
+      actionHint:
+        options.enableNotificationHints === false
+          ? undefined
+          : `Review task ${input.entityUuid}, then claim it only if you are ready to work on it.`,
     }
   }
 

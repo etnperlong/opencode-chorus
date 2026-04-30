@@ -17,6 +17,7 @@ export async function enqueueRoutedNotification(stateStore: StateStore, routed: 
           kind: routed.kind,
           entityUuid: routed.entityUuid,
           projectUuid: routed.projectUuid,
+          actionHint: routed.kind === "task_assigned" ? routed.actionHint : undefined,
           createdAt: new Date().toISOString(),
           status: "pending",
         },
