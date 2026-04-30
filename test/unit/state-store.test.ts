@@ -13,6 +13,28 @@ describe("migrateOpenCodeState", () => {
     expect(result.runtime).toBe("opencode")
     expect(result.planningScopes).toEqual({})
   })
+
+  it("drops malformed session context while preserving existing state", () => {
+    const result = migrateOpenCodeState({
+      mainSession: { status: "active", runtimeSessionId: "runtime-1" },
+      reviews: { current: { currentRound: 1, maxRounds: 1, status: "reviewing", blockersSnapshot: [] } },
+      sessionContext: "not-an-object",
+    })
+
+    expect(result.mainSession.runtimeSessionId).toBe("runtime-1")
+    expect(result.reviews.current?.status).toBe("reviewing")
+    expect(result.sessionContext).toBeUndefined()
+  })
+
+  it("drops object-shaped session context without required fields", () => {
+    const result = migrateOpenCodeState({
+      mainSession: { status: "active", runtimeSessionId: "runtime-1" },
+      sessionContext: {},
+    })
+
+    expect(result.mainSession.runtimeSessionId).toBe("runtime-1")
+    expect(result.sessionContext).toBeUndefined()
+  })
 })
 
 describe("migrateSharedState", () => {

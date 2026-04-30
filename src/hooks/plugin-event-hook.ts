@@ -14,9 +14,10 @@ type PluginEventPayload = {
 
 type CreatePluginEventHookOptions = {
   autoStart: boolean
+  enableSessionContextSummary: boolean
   stateStore: StateStore
   sessionLifecycle: SessionLifecycle
-  logger: Pick<Logger, "debug">
+  logger: Pick<Logger, "debug" | "info">
 }
 
 export function createPluginEventHook(options: CreatePluginEventHookOptions) {
@@ -41,6 +42,9 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
           await cleanupOrphanWorkers(options.stateStore)
           await markInterruptedReviews(options.stateStore)
           await options.sessionLifecycle.start(sessionId, { replaceExisting })
+          if (options.enableSessionContextSummary) {
+            await options.sessionLifecycle.surfaceContextSummary(sessionId, options.logger)
+          }
         }
         hasHandledSessionCreated = true
       }

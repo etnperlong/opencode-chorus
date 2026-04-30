@@ -33,6 +33,7 @@ export function migrateOpenCodeState(input: unknown): OpenCodeState {
     planningScopes: state.planningScopes ?? {},
     workers: state.workers ?? {},
     reviews: state.reviews ?? {},
+    sessionContext: isSessionContextRecord(state.sessionContext) ? state.sessionContext : undefined,
     notificationQueue: state.notificationQueue ?? [],
     checkpoints: state.checkpoints ?? {},
   }
@@ -48,4 +49,18 @@ export function migrateSharedState(input: unknown): SharedState {
     context: state.context ?? {},
     orphanHints: state.orphanHints ?? [],
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function isSessionContextRecord(value: unknown): value is OpenCodeState["sessionContext"] {
+  return (
+    isRecord(value) &&
+    value.source === "chorus_checkin" &&
+    typeof value.runtimeSessionId === "string" &&
+    typeof value.lastRefreshedAt === "string" &&
+    Array.isArray(value.projects)
+  )
 }

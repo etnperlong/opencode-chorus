@@ -35,10 +35,39 @@ export type WorkerRecord = {
 export type ReviewRecord = {
   currentRound: number
   maxRounds: number
-  status: "idle" | "reviewing" | "changes-requested" | "approved" | "escalated"
+  status: "idle" | "reviewing" | "changes-requested" | "approved" | "escalated" | "timed-out" | "interrupted"
   lastVerdict?: "PASS" | "PASS_WITH_NOTES" | "FAIL"
   lastReviewJobId?: string
+  lastGateStatus?: "completed" | "timeout" | "escalated" | "interrupted"
+  lastGateMessage?: string
   blockersSnapshot: string[]
+}
+
+export type SessionContextRecord = {
+  source: "chorus_checkin"
+  runtimeSessionId: string
+  lastRefreshedAt: string
+  lastSurfacedAt?: string
+  lastSurfacedRuntimeSessionId?: string
+  agent?: {
+    uuid?: string
+    name?: string
+    roles: string[]
+  }
+  owner?: {
+    uuid?: string
+    name?: string
+  }
+  projects: Array<{
+    uuid: string
+    name: string
+    ideaCount?: number
+    taskCount?: number
+    pendingProposalCount?: number
+  }>
+  notifications?: {
+    unread: number
+  }
 }
 
 export type QueuedNotification = {
@@ -46,6 +75,7 @@ export type QueuedNotification = {
   kind: string
   entityUuid?: string
   projectUuid?: string
+  actionHint?: string
   createdAt: string
   status: "pending" | "processing" | "done" | "failed"
 }
@@ -63,6 +93,7 @@ export type OpenCodeState = {
   planningScopes: Record<string, PlanningScopeRecord>
   workers: Record<string, WorkerRecord>
   reviews: Record<string, ReviewRecord>
+  sessionContext?: SessionContextRecord
   notificationQueue: QueuedNotification[]
   checkpoints: {
     lastUnreadBackfillAt?: string

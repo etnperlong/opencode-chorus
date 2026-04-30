@@ -43,6 +43,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
   const planningLifecycle = new PlanningLifecycle(stateStore)
   const eventHook = createPluginEventHook({
     autoStart: config.autoStart,
+    enableSessionContextSummary: config.enableSessionContextSummary,
     stateStore,
     sessionLifecycle,
     logger,
@@ -87,7 +88,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     const notification = await fetchUnreadNotificationByUuid(chorusClient, event.notificationUuid)
     if (!notification) return
 
-    const routed = routeNotification(notification)
+    const routed = routeNotification(notification, { enableNotificationHints: config.enableNotificationHints })
     if (routed.kind === "ignored") return
 
     await enqueueRoutedNotification(stateStore, routed)
