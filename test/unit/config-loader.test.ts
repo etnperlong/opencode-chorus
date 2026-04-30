@@ -134,6 +134,51 @@ describe("config loader", () => {
     }
   })
 
+  it("uses default observability config values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {
+          chorusUrl: "http://localhost:8637",
+          apiKey: "test-key",
+        },
+        { OPENCODE_CONFIG_DIR: configDir },
+      )
+
+      expect(config.enableSessionContextSummary).toBe(true)
+      expect(config.enableNotificationHints).toBe(true)
+      expect(config.reviewGateOutputMode).toBe("summary")
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("reads observability config values from chorus.json", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      await writeFile(
+        join(configDir, "chorus.json"),
+        JSON.stringify({
+          chorusUrl: "http://chorus-from-file:3000",
+          apiKey: "file-key",
+          enableSessionContextSummary: false,
+          enableNotificationHints: false,
+          reviewGateOutputMode: "detailed",
+        }),
+      )
+
+      const { config } = await loadChorusConfig({}, { OPENCODE_CONFIG_DIR: configDir })
+
+      expect(config.enableSessionContextSummary).toBe(false)
+      expect(config.enableNotificationHints).toBe(false)
+      expect(config.reviewGateOutputMode).toBe("detailed")
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
   it("lets explicit plugin options set reviewer gate runtime config values", async () => {
     const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
 
@@ -260,6 +305,80 @@ describe("config loader", () => {
 
       expect(config.reviewerWaitTimeoutMs).toBe(25)
       expect(config.reviewerPollIntervalMs).toBe(5)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("parses observability config environment values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {},
+        {
+          OPENCODE_CONFIG_DIR: configDir,
+          CHORUS_BASE_URL: "http://localhost:8637",
+          CHORUS_API_KEY: "test-key",
+          CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY: "false",
+          CHORUS_ENABLE_NOTIFICATION_HINTS: "0",
+          CHORUS_REVIEW_GATE_OUTPUT_MODE: "detailed",
+        },
+      )
+
+      expect(config.enableSessionContextSummary).toBe(false)
+      expect(config.enableNotificationHints).toBe(false)
+      expect(config.reviewGateOutputMode).toBe("detailed")
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("lets explicit observability options override environment values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {
+          chorusUrl: "http://localhost:8637",
+          apiKey: "option-key",
+          enableSessionContextSummary: true,
+          enableNotificationHints: true,
+          reviewGateOutputMode: "summary",
+        },
+        {
+          OPENCODE_CONFIG_DIR: configDir,
+          CHORUS_BASE_URL: "http://localhost:8637",
+          CHORUS_API_KEY: "env-key",
+          CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY: "false",
+          CHORUS_ENABLE_NOTIFICATION_HINTS: "false",
+          CHORUS_REVIEW_GATE_OUTPUT_MODE: "detailed",
+        },
+      )
+
+      expect(config.enableSessionContextSummary).toBe(true)
+      expect(config.enableNotificationHints).toBe(true)
+      expect(config.reviewGateOutputMode).toBe("summary")
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("falls back to summary for invalid review gate output mode values", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {},
+        {
+          OPENCODE_CONFIG_DIR: configDir,
+          CHORUS_BASE_URL: "http://localhost:8637",
+          CHORUS_API_KEY: "test-key",
+          CHORUS_REVIEW_GATE_OUTPUT_MODE: "verbose",
+        },
+      )
+
+      expect(config.reviewGateOutputMode).toBe("summary")
     } finally {
       await rm(configDir, { recursive: true, force: true })
     }

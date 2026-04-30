@@ -1,9 +1,12 @@
 import {
   DEFAULT_AUTO_START,
+  DEFAULT_ENABLE_NOTIFICATION_HINTS,
   DEFAULT_ENABLE_PROPOSAL_REVIEWER,
+  DEFAULT_ENABLE_SESSION_CONTEXT_SUMMARY,
   DEFAULT_ENABLE_TASK_REVIEWER,
   DEFAULT_MAX_PROPOSAL_REVIEW_ROUNDS,
   DEFAULT_MAX_TASK_REVIEW_ROUNDS,
+  DEFAULT_REVIEW_GATE_OUTPUT_MODE,
   DEFAULT_REVIEWER_POLL_INTERVAL_MS,
   DEFAULT_REVIEWER_WAIT_TIMEOUT_MS,
   DEFAULT_SHARED_STATE_MODE,
@@ -11,6 +14,7 @@ import {
 } from "./defaults"
 
 export type SharedStateMode = "compatible" | "isolated"
+export type ReviewGateOutputMode = "summary" | "detailed"
 
 export type OpenCodeChorusConfig = {
   chorusUrl: string
@@ -23,6 +27,9 @@ export type OpenCodeChorusConfig = {
   maxTaskReviewRounds: number
   reviewerWaitTimeoutMs: number
   reviewerPollIntervalMs: number
+  enableSessionContextSummary: boolean
+  enableNotificationHints: boolean
+  reviewGateOutputMode: ReviewGateOutputMode
   stateDir: string
   sharedStateMode: SharedStateMode
 }
@@ -75,6 +82,16 @@ export function resolveConfig(input: Record<string, unknown>): OpenCodeChorusCon
       input.reviewerPollIntervalMs,
       DEFAULT_REVIEWER_POLL_INTERVAL_MS,
     ),
+    enableSessionContextSummary:
+      input.enableSessionContextSummary === undefined
+        ? DEFAULT_ENABLE_SESSION_CONTEXT_SUMMARY
+        : Boolean(input.enableSessionContextSummary),
+    enableNotificationHints:
+      input.enableNotificationHints === undefined
+        ? DEFAULT_ENABLE_NOTIFICATION_HINTS
+        : Boolean(input.enableNotificationHints),
+    reviewGateOutputMode:
+      input.reviewGateOutputMode === "detailed" ? "detailed" : DEFAULT_REVIEW_GATE_OUTPUT_MODE,
     stateDir: String(input.stateDir ?? DEFAULT_STATE_DIR),
     sharedStateMode:
       input.sharedStateMode === "isolated" ? "isolated" : DEFAULT_SHARED_STATE_MODE,

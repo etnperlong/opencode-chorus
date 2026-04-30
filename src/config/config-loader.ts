@@ -91,6 +91,9 @@ function parseEnvConfig(env: ChorusConfigEnv): PartialConfig {
     maxTaskReviewRounds: parsePositiveInteger(env.CHORUS_MAX_TASK_REVIEW_ROUNDS),
     reviewerWaitTimeoutMs: parsePositiveInteger(env.CHORUS_REVIEWER_WAIT_TIMEOUT_MS),
     reviewerPollIntervalMs: parsePositiveInteger(env.CHORUS_REVIEWER_POLL_INTERVAL_MS),
+    enableSessionContextSummary: parseBoolean(env.CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY),
+    enableNotificationHints: parseBoolean(env.CHORUS_ENABLE_NOTIFICATION_HINTS),
+    reviewGateOutputMode: parseReviewGateOutputMode(env.CHORUS_REVIEW_GATE_OUTPUT_MODE),
   })
 }
 
@@ -138,6 +141,11 @@ function parseBoolean(value: string | undefined): boolean | undefined {
 function parsePositiveInteger(value: string | undefined): number | undefined {
   const parsed = Number(value)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+function parseReviewGateOutputMode(value: string | undefined): "summary" | "detailed" | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "summary" || normalized === "detailed") return normalized
 }
 
 function expandHome(path: string): string {
