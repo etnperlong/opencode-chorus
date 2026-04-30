@@ -21,19 +21,19 @@ type CreatePluginEventHookOptions = {
 }
 
 export function createPluginEventHook(options: CreatePluginEventHookOptions) {
-  let hasHandledSessionCreated = false
+  let hasHandledSessionStartup = false
 
   return async ({ event }: PluginEventPayload): Promise<void> => {
     await options.logger.debug("Observed OpenCode event", { type: event.type })
 
-    if (event.type === "session.created") {
+    if (event.type === "session.created" || (event.type === "session.updated" && !hasHandledSessionStartup)) {
       const sessionId = extractSessionEventId(event)
       if (sessionId) {
         const state = await options.stateStore.readOpenCodeState()
         const replaceExisting = shouldReplaceMainSessionOnStartup(
           state.mainSession,
           sessionId,
-          hasHandledSessionCreated,
+          hasHandledSessionStartup,
         )
         if (
           options.autoStart &&
@@ -46,7 +46,7 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
             await options.sessionLifecycle.surfaceContextSummary(sessionId, options.logger)
           }
         }
-        hasHandledSessionCreated = true
+        hasHandledSessionStartup = true
       }
     }
 

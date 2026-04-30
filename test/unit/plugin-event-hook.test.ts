@@ -76,6 +76,35 @@ describe("plugin event hook", () => {
       lastGateMessage: "Reviewer session was interrupted before posting a verdict",
     })
   })
+
+  it("uses the first session.updated event as a startup fallback once", async () => {
+    const store = await createStore()
+    const startCalls: Array<{ sessionId: string; replaceExisting: boolean }> = []
+    const surfacedSessions: string[] = []
+
+    const hook = createPluginEventHook({
+      autoStart: true,
+      enableSessionContextSummary: true,
+      stateStore: store,
+      sessionLifecycle: {
+        start: async (sessionId: string, options: { replaceExisting: boolean }) => {
+          startCalls.push({ sessionId, replaceExisting: options.replaceExisting })
+        },
+        surfaceContextSummary: async (sessionId: string) => {
+          surfacedSessions.push(sessionId)
+        },
+        heartbeat: async () => {},
+        stop: async () => {},
+      } as never,
+      logger: { debug: async () => {}, info: async () => {} },
+    })
+
+    await hook({ event: { type: "session.updated", properties: { info: { id: "runtime-updated" } } } })
+    await hook({ event: { type: "session.updated", properties: { info: { id: "runtime-updated" } } } })
+
+    expect(startCalls).toEqual([{ sessionId: "runtime-updated", replaceExisting: false }])
+    expect(surfacedSessions).toEqual(["runtime-updated"])
+  })
 })
 
 async function createStore(): Promise<StateStore> {
