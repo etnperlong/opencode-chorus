@@ -146,7 +146,7 @@ describe("bundled skill metadata", () => {
         author: "chorus",
         version: "0.7.5",
         category: "project-management",
-        mcp_server: "chorus",
+        mcp_server: "lazy-chorus-bridge",
         workflow: expected.workflow,
         role: expected.role,
         audience: "opencode-agents",

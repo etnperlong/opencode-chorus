@@ -7,7 +7,7 @@ metadata:
   author: chorus
   version: "0.7.5"
   category: project-management
-  mcp_server: chorus
+  mcp_server: lazy-chorus-bridge
   workflow: full-auto
   role: all-roles
   audience: opencode-agents
@@ -20,6 +20,10 @@ metadata:
 # Yolo Skill
 
 Full-auto AI-DLC pipeline. User provides a prompt; agent drives the entire lifecycle: Idea -> Elaboration -> Proposal -> Review -> Execute -> Verify -> Done.
+
+## OpenCode Tool Access
+
+In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore` and `chorus_tool_execute`. Tool examples below name the real Chorus operations for clarity; execute them through `chorus_tool_execute` with `toolName` set to the named operation and `arguments` set to the shown payload.
 
 ---
 

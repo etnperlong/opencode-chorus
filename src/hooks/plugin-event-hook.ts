@@ -17,7 +17,8 @@ type CreatePluginEventHookOptions = {
   enableSessionContextSummary: boolean
   stateStore: StateStore
   sessionLifecycle: SessionLifecycle
-  logger: Pick<Logger, "debug" | "info">
+  logger: Pick<Logger, "debug" | "info" | "warn">
+  onSessionStartup?: () => Promise<void>
 }
 
 export function createPluginEventHook(options: CreatePluginEventHookOptions) {
@@ -44,6 +45,13 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
           await options.sessionLifecycle.start(sessionId, { replaceExisting })
           if (options.enableSessionContextSummary) {
             await options.sessionLifecycle.surfaceContextSummary(sessionId, options.logger)
+          }
+          try {
+            await options.onSessionStartup?.()
+          } catch (error) {
+            await options.logger.warn("Failed to refresh Chorus lazy bridge on session startup", {
+              error: error instanceof Error ? error.message : String(error),
+            })
           }
         }
         hasHandledSessionStartup = true

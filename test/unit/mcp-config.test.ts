@@ -23,6 +23,22 @@ describe("createChorusMcpHeaders", () => {
       Authorization: "Bearer test-key",
     })
   })
+
+  it("adds project scope headers when a Chorus tool call is scoped", () => {
+    expect(createChorusMcpHeaders("test-key", { projectUuid: "project-1" })).toEqual({
+      Authorization: "Bearer test-key",
+      "X-Chorus-Project": "project-1",
+    })
+  })
+
+  it("prefers project group scope over project scope", () => {
+    expect(
+      createChorusMcpHeaders("test-key", { projectUuid: "project-1", projectGroupUuid: "group-1" }),
+    ).toEqual({
+      Authorization: "Bearer test-key",
+      "X-Chorus-Project-Group": "group-1",
+    })
+  })
 })
 
 describe("createChorusRemoteMcpConfig", () => {

@@ -7,7 +7,7 @@ metadata:
   author: chorus
   version: "0.7.5"
   category: project-management
-  mcp_server: chorus
+  mcp_server: lazy-chorus-bridge
   workflow: quick-development
   role: admin-or-developer-agent
   audience: opencode-agents
@@ -20,6 +20,10 @@ metadata:
 # Quick Dev Skill
 
 Skip the full AI-DLC pipeline (Idea → Elaboration → Proposal → Approval) and create tasks directly. Ideal for small, well-understood work. The goal is for agents to **autonomously record their development work and verify task completion** through structured acceptance criteria.
+
+## OpenCode Tool Access
+
+In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore` and `chorus_tool_execute`. Tool examples below name the real Chorus operations for clarity; execute them through `chorus_tool_execute` with `toolName` set to the named operation and `arguments` set to the shown payload.
 
 ---
 

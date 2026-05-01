@@ -1,4 +1,5 @@
 import type { ChorusMcpClient } from "../chorus/mcp-client"
+import { resolveChorusToolScope, type ChorusToolScope } from "../chorus/tool-scope"
 import type { OpenCodeChorusConfig } from "../config/schema"
 import type { PlanningLifecycle } from "../lifecycle/planning-lifecycle"
 import { normalizeChorusToolName, planningPatchForTool } from "../planning/planning-tool-hooks"
@@ -47,7 +48,9 @@ type CreateToolExecuteAfterHookOptions = {
 
 export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOptions) {
   return async (input: ToolExecuteAfterInput, output: ToolExecuteAfterOutput): Promise<void> => {
-    const tool = normalizeChorusToolName(input.tool)
+    const effective = resolveEffectiveToolCall(input.tool, input.args)
+    const tool = effective.tool
+    const args = effective.args
     const planningPatch = planningPatchForTool(tool)
     if (planningPatch) {
       const state = await options.stateStore.readOpenCodeState()
@@ -61,11 +64,11 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
     }
 
     if (tool === "chorus_add_comment") {
-      const targetType = extractStringField(input.args, "targetType")
+      const targetType = extractStringField(args, "targetType")
       if (targetType !== "proposal" && targetType !== "task") return
 
-      const targetUuid = extractStringField(input.args, "targetUuid")
-      const content = extractStringField(input.args, "content")
+      const targetUuid = extractStringField(args, "targetUuid")
+      const content = extractStringField(args, "content")
       if (!targetUuid || !content) return
 
       let verdict: ReturnType<typeof parseVerdict>
@@ -93,12 +96,13 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
 
     if (tool === "chorus_pm_submit_proposal" && options.config.enableProposalReviewer) {
       const proposalUuid =
-        extractStringField(input.args, "proposalUuid") ??
+        extractStringField(args, "proposalUuid") ??
         extractStringField(parseJsonObject(output.output), "proposalUuid")
       if (!proposalUuid) return
 
       const targetKey = `proposal:${proposalUuid}`
-      const targetSignature = await readTargetSignature(options.chorusClient, "proposal", proposalUuid)
+      const toolScope = await resolveChorusToolScope(options.stateStore)
+      const targetSignature = await readTargetSignature(options.chorusClient, "proposal", proposalUuid, toolScope)
       if (!targetSignature) {
         const existing = await readExistingReview(options.stateStore, targetKey)
         if (existing) {
@@ -187,6 +191,7 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         timeoutMs: options.config.reviewerWaitTimeoutMs,
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
+        scope: toolScope,
       })
       attachReviewerGateResult(output, waitResult, reviewJobId, {
         round: review.currentRound,
@@ -199,11 +204,12 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
     }
 
     if (tool === "chorus_submit_for_verify" && options.config.enableTaskReviewer) {
-      const taskUuid = extractStringField(input.args, "taskUuid")
+      const taskUuid = extractStringField(args, "taskUuid")
       if (!taskUuid) return
 
       const targetKey = `task:${taskUuid}`
-      const targetSignature = await readTargetSignature(options.chorusClient, "task", taskUuid)
+      const toolScope = await resolveChorusToolScope(options.stateStore)
+      const targetSignature = await readTargetSignature(options.chorusClient, "task", taskUuid, toolScope)
       if (!targetSignature) {
         const existing = await readExistingReview(options.stateStore, targetKey)
         if (existing) {
@@ -292,6 +298,7 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         timeoutMs: options.config.reviewerWaitTimeoutMs,
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
+        scope: toolScope,
       })
       attachReviewerGateResult(output, waitResult, reviewJobId, {
         round: review.currentRound,
@@ -305,18 +312,31 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
   }
 }
 
+function resolveEffectiveToolCall(tool: string, args: unknown): { tool: string; args: unknown } {
+  const normalizedTool = normalizeChorusToolName(tool)
+  if (normalizedTool !== "chorus_tool_execute") return { tool: normalizedTool, args }
+  const toolName = extractStringField(args, "toolName")
+  if (!toolName) return { tool: normalizedTool, args }
+  return { tool: normalizeChorusToolName(toolName), args: isRecord(args) ? args.arguments : undefined }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
 async function readTargetSignature(
   client: ChorusMcpClient,
   targetType: "proposal" | "task",
   targetUuid: string,
+  scope?: ChorusToolScope,
 ): Promise<string | undefined> {
   try {
     if (targetType === "proposal") {
-      const proposal = await client.callTool("chorus_get_proposal", { proposalUuid: targetUuid })
+      const proposal = await client.callTool("chorus_get_proposal", { proposalUuid: targetUuid }, scope)
       return buildReviewTargetSignature(targetType, proposal)
     }
 
-    const task = await client.callTool("chorus_get_task", { taskUuid: targetUuid })
+    const task = await client.callTool("chorus_get_task", { taskUuid: targetUuid }, scope)
     return buildReviewTargetSignature(targetType, task)
   } catch {
     return undefined

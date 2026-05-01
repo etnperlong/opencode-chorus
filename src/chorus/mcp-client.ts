@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
-import { createChorusMcpHeaders, resolveChorusMcpUrl } from "./mcp-config"
+import { createChorusMcpHeaders, resolveChorusMcpUrl, type ChorusMcpScope } from "./mcp-config"
 import type { ChorusToolTextContent, McpClientStatus } from "./types"
 
 type ChorusMcpClientOptions = {
@@ -9,6 +9,12 @@ type ChorusMcpClientOptions = {
 }
 
 type McpToolResult = Awaited<ReturnType<Client["callTool"]>>
+
+export type ChorusMcpToolDefinition = {
+  name: string
+  description?: string
+  inputSchema: Record<string, unknown>
+}
 
 export function parseToolResult(content: ChorusToolTextContent[]): unknown {
   const text = content.find((item) => item.type === "text" && item.text !== undefined)?.text
@@ -73,7 +79,9 @@ export class ChorusMcpClient {
     }
   }
 
-  async callTool<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
+  async callTool<T>(name: string, args: Record<string, unknown> = {}, scope?: ChorusMcpScope): Promise<T> {
+    if (scope) return this.callScopedTool<T>(name, args, scope)
+
     try {
       return await this.callConnectedTool<T>(name, args)
     } catch (error) {
@@ -88,15 +96,31 @@ export class ChorusMcpClient {
     }
   }
 
+  async listTools(): Promise<ChorusMcpToolDefinition[]> {
+    await this.connect()
+    if (!this.client) throw new Error("Chorus MCP client is not connected")
+
+    const tools: ChorusMcpToolDefinition[] = []
+    let cursor: string | undefined
+    do {
+      const result = await this.client.listTools({ cursor })
+      tools.push(
+        ...result.tools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          inputSchema: tool.inputSchema as Record<string, unknown>,
+        })),
+      )
+      cursor = result.nextCursor
+    } while (cursor)
+
+    return tools
+  }
+
   private async openConnection(generation: number): Promise<void> {
     this.statusValue = this.statusValue === "reconnecting" ? "reconnecting" : "connecting"
 
-    const client = new Client({ name: "opencode-chorus", version: "0.1.0" })
-    const transport = new StreamableHTTPClientTransport(new URL(resolveChorusMcpUrl(this.options.chorusUrl)), {
-      requestInit: {
-        headers: createChorusMcpHeaders(this.options.apiKey),
-      },
-    })
+    const { client, transport } = this.createClientAndTransport()
 
     try {
       await client.connect(transport)
@@ -126,6 +150,29 @@ export class ChorusMcpClient {
 
     if ("content" in result) return parseToolResult(result.content as ChorusToolTextContent[]) as T
     return result.toolResult as T
+  }
+
+  private async callScopedTool<T>(name: string, args: Record<string, unknown>, scope: ChorusMcpScope): Promise<T> {
+    const { client, transport } = this.createClientAndTransport(scope)
+    try {
+      await client.connect(transport)
+      const result = await client.callTool({ name, arguments: args })
+      if ("isError" in result && result.isError) throw new Error(this.formatToolError(result))
+      if ("content" in result) return parseToolResult(result.content as ChorusToolTextContent[]) as T
+      return result.toolResult as T
+    } finally {
+      await client.close().catch(() => transport.close())
+    }
+  }
+
+  private createClientAndTransport(scope?: ChorusMcpScope): { client: Client; transport: StreamableHTTPClientTransport } {
+    const client = new Client({ name: "opencode-chorus", version: "0.1.0" })
+    const transport = new StreamableHTTPClientTransport(new URL(resolveChorusMcpUrl(this.options.chorusUrl)), {
+      requestInit: {
+        headers: createChorusMcpHeaders(this.options.apiKey, scope),
+      },
+    })
+    return { client, transport }
   }
 
   private formatToolError(result: McpToolResult): string {

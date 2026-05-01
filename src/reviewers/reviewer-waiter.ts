@@ -1,4 +1,5 @@
 import type { ChorusMcpClient } from "../chorus/mcp-client"
+import type { ChorusToolScope } from "../chorus/tool-scope"
 import type { StateStore } from "../state/state-store"
 import type { ReviewRecord } from "../state/state-types"
 import { parseVerdict, type ReviewVerdict } from "./review-parser"
@@ -20,6 +21,7 @@ type ReviewerWaitOptions = {
   timeoutMs: number
   pollIntervalMs: number
   reviewJobId?: string
+  scope?: ChorusToolScope
 }
 
 export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Promise<ReviewerWaitResult> {
@@ -36,7 +38,7 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
     const result = await callToolWithTimeout(options.client, remainingMs, "chorus_get_comments", {
       targetType: options.targetType,
       targetUuid: options.targetUuid,
-    })
+    }, options.scope)
     if (result.status === "timeout") return timeoutResult(options)
 
     for (const content of extractCommentContents(result.value)) {
@@ -89,8 +91,9 @@ async function callToolWithTimeout(
   timeoutMs: number,
   name: string,
   args: Record<string, unknown>,
+  scope?: ChorusToolScope,
 ): Promise<{ status: "completed"; value: unknown } | { status: "timeout" }> {
-  const call = client.callTool<unknown>(name, args)
+  const call = client.callTool<unknown>(name, args, scope)
   void call.catch(() => {})
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined

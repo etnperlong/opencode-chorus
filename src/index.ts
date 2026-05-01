@@ -12,6 +12,7 @@ import { fetchUnreadNotificationByUuid } from "./notifications/notification-pagi
 import { routeNotification } from "./notifications/notification-router"
 import { ChorusSseListener, type SseNotificationEvent } from "./notifications/sse-listener"
 import { StateStore } from "./state/state-store"
+import { createChorusLazyBridge } from "./tools/lazy-bridge-tools"
 import { formatError } from "./util/error-utils"
 import { createLogger } from "./util/logger"
 
@@ -29,15 +30,24 @@ export const createPlugin: Plugin = async (ctx, options) => {
     throw error
   }
   const config = loadedConfig.config
-  const applyPluginConfig = createPluginConfigApplier({
-    chorusUrl: config.chorusUrl,
-    apiKey: config.apiKey,
-  })
+  const applyPluginConfig = createPluginConfigApplier()
   const stateStore = new StateStore(ctx.directory, config.stateDir)
   await stateStore.init()
   const chorusClient = new ChorusMcpClient({
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
+  })
+  const lazyBridge = createChorusLazyBridge({
+    chorusClient,
+    stateStore,
+    tui: ctx.client.tui
+      ? {
+          showToast: async (input) => {
+            await ctx.client.tui.showToast({ body: { ...input, message: input.message ?? "", variant: input.variant ?? "info" } })
+          },
+        }
+      : undefined,
+    chorusUrl: config.chorusUrl,
   })
   const sessionLifecycle = new SessionLifecycle(stateStore, chorusClient, config.chorusUrl)
   const planningLifecycle = new PlanningLifecycle(stateStore)
@@ -47,6 +57,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
     stateStore,
     sessionLifecycle,
     logger,
+    onSessionStartup: async () => {
+      await lazyBridge.refresh()
+    },
   })
   const toolExecuteAfterHook = createToolExecuteAfterHook({
     config,
@@ -80,6 +93,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     config: applyPluginConfig,
     event: eventHook,
     "tool.execute.after": toolExecuteAfterHook,
+    tool: lazyBridge.tools,
   }
 
   async function handleNotificationEvent(event: SseNotificationEvent): Promise<void> {

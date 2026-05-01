@@ -35,6 +35,32 @@ describe("isRetryableMcpSessionError", () => {
 })
 
 describe("ChorusMcpClient", () => {
+  it("lists tools across paginated MCP responses", async () => {
+    const client = new ChorusMcpClient({ chorusUrl: "https://chorus.example", apiKey: "test" })
+    client["statusValue"] = "connected"
+    client["client"] = {
+      listTools: async ({ cursor }: { cursor?: string } = {}) => {
+        if (!cursor) {
+          return {
+            tools: [
+              { name: "chorus_checkin", description: "Check in", inputSchema: { type: "object" } },
+            ],
+            nextCursor: "page-2",
+          }
+        }
+        return {
+          tools: [
+            { name: "chorus_get_task", description: "Get task", inputSchema: { type: "object" } },
+          ],
+        }
+      },
+    } as never
+
+    const tools = await client.listTools()
+
+    expect(tools.map((tool) => tool.name)).toEqual(["chorus_checkin", "chorus_get_task"])
+  })
+
   it("clears stale in-flight connect promises on disconnect", async () => {
     const client = new ChorusMcpClient({ chorusUrl: "https://chorus.example", apiKey: "test" })
     client["connectPromise"] = Promise.resolve()

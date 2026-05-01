@@ -7,7 +7,7 @@ metadata:
   author: chorus
   version: "0.7.5"
   category: project-management
-  mcp_server: chorus
+  mcp_server: lazy-chorus-bridge
   workflow: overview
   role: all
   audience: opencode-agents
@@ -65,7 +65,7 @@ The checkin response includes **owner/master information** for the agent:
 
 #### Project Filtering
 
-Results can be filtered by project(s) using optional HTTP headers in your OpenCode `opencode.json` MCP configuration:
+Results can be filtered by project(s). In plugin lazy-bridge mode, the bridge reads `.chorus/shared.json` and applies the matching MCP headers when executing real Chorus tools. In manual remote-MCP fallback mode, configure the headers directly in your OpenCode MCP configuration:
 
 | Header | Format | Example |
 |--------|--------|---------|
@@ -80,7 +80,7 @@ Results can be filtered by project(s) using optional HTTP headers in your OpenCo
 
 **Affected tools**: `chorus_checkin`, `chorus_get_my_assignments`
 
-**Example `opencode.json`**:
+**Manual fallback `opencode.json` example**:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
@@ -247,9 +247,16 @@ API Keys must be created manually by the user in the Chorus Web UI.
 
 ### 2. OpenCode MCP Server Configuration
 
-Preferred: configure the `opencode-chorus` plugin with `chorus.json` in the OpenCode config directory or environment variables. When `chorusUrl` and `apiKey` are available, the plugin auto-registers a native `chorus` remote MCP server.
+Preferred: configure the `opencode-chorus` plugin with `chorus.json` in the OpenCode config directory or environment variables. When `chorusUrl` and `apiKey` are available, the plugin exposes a lazy Chorus bridge instead of injecting a remote `mcp.chorus` server into OpenCode.
 
-Manual fallback: add a remote MCP server to `opencode.json` or `opencode.jsonc`:
+In OpenCode, use the bridge tools for Chorus access:
+
+1. `chorus_tool_explore` — search or inspect real Chorus tools such as `chorus_checkin`, `chorus_get_task`, or `chorus_update_task`.
+2. `chorus_tool_execute` — execute the real Chorus tool by name with its arguments.
+
+Examples in these skills still name real Chorus tools directly for clarity. In OpenCode lazy-bridge mode, execute those real tools through `chorus_tool_execute`.
+
+Manual fallback for non-plugin setups: add a remote MCP server to `opencode.json` or `opencode.jsonc`:
 
 ```json
 {
@@ -272,7 +279,7 @@ Restart OpenCode after changing `opencode.json`, `chorus.json`, or related envir
 ### 3. Verify Connection
 
 ```
-chorus_checkin()
+chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 ```
 
 If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode restarted?
@@ -317,7 +324,7 @@ Chorus integrations share lifecycle concepts, but runtime wiring differs. For Op
 
 | Area | OpenCode plugin | Codex integration | Claude runtime integration |
 |------|-----------------|-------------------|----------------------------|
-| MCP setup | Auto-registers the native remote `chorus` MCP server from `chorus.json` or environment variables; `opencode.json` MCP config is a fallback. | Uses Codex runtime MCP configuration. | Uses that runtime's MCP configuration. |
+| MCP setup | Exposes lazy bridge tools from `chorus.json` or environment variables; direct `opencode.json` MCP config is a manual fallback. | Uses Codex runtime MCP configuration. | Uses that runtime's MCP configuration. |
 | Reviewer automation | `chorus_pm_submit_proposal` and `chorus_submit_for_verify` auto-launch read-only reviewer child sub-agents and wait for the current verdict or timeout. | Reviewer flow may be advisory or manually invoked by its runtime contract. | Reviewer flow follows that integration's hook and agent model. |
 | Session state | Plugin creates, heartbeats, reopens, and closes sessions; sub-agents receive injected session context. | Session behavior follows the Codex integration contract. | Session behavior follows that runtime integration contract. |
 | Hooks/events | Uses OpenCode plugin config, event, and `tool.execute.after` hooks. | Uses Codex runtime hooks or workflow entry points. | Uses that runtime's hook behavior. |

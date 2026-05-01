@@ -113,6 +113,31 @@ describe("waitForReviewerVerdict", () => {
     ])
   })
 
+  it("polls reviewer comments with the provided Chorus tool scope", async () => {
+    const store = await createStore()
+    const client = new FakeMcpClient([{ comments: [{ content: "Scoped review\nVERDICT: PASS" }] }])
+
+    const result = await waitForReviewerVerdict({
+      client,
+      stateStore: store,
+      targetKey: "task:task-scoped",
+      targetType: "task",
+      targetUuid: "task-scoped",
+      timeoutMs: 20,
+      pollIntervalMs: 1,
+      scope: { projectUuid: "project-1" },
+    })
+
+    expect(result).toEqual({ status: "completed", verdict: "PASS", comment: "Scoped review\nVERDICT: PASS" })
+    expect(client.calls).toEqual([
+      {
+        name: "chorus_get_comments",
+        args: { targetType: "task", targetUuid: "task-scoped" },
+        scope: { projectUuid: "project-1" },
+      },
+    ])
+  })
+
   it("uses only comments marked with the current review job id", async () => {
     const store = await createStore()
     await persistReview(store, "task:task-current", undefined, "reviewing", "review-session-2")
@@ -263,13 +288,13 @@ describe("waitForReviewerVerdict", () => {
 })
 
 class FakeMcpClient {
-  readonly calls: Array<{ name: string; args: Record<string, unknown> }> = []
+  readonly calls: Array<{ name: string; args: Record<string, unknown>; scope?: Record<string, unknown> }> = []
   private nextResponse = 0
 
   constructor(private readonly responses: unknown[]) {}
 
-  async callTool<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
-    this.calls.push({ name, args })
+  async callTool<T>(name: string, args: Record<string, unknown> = {}, scope?: Record<string, unknown>): Promise<T> {
+    this.calls.push({ name, args, ...(scope ? { scope } : {}) })
     const response = this.responses[Math.min(this.nextResponse, this.responses.length - 1)]
     this.nextResponse += 1
     return response as T

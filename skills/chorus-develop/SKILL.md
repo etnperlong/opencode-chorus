@@ -7,7 +7,7 @@ metadata:
   author: chorus
   version: "0.7.5"
   category: project-management
-  mcp_server: chorus
+  mcp_server: lazy-chorus-bridge
   workflow: development
   role: developer-agent
   audience: opencode-agents
@@ -20,6 +20,10 @@ metadata:
 # Develop Skill
 
 This skill covers the **Development** stage of the AI-DLC workflow: claiming Tasks, writing code, reporting progress, submitting for verification, and managing sessions for sub-agent observability.
+
+## OpenCode Tool Access
+
+In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore` and `chorus_tool_execute`. Tool examples below name the real Chorus operations for clarity; execute them through `chorus_tool_execute` with `toolName` set to the named operation and `arguments` set to the shown payload.
 
 ---
 
@@ -352,7 +356,7 @@ task({
 
 ### MCP Access for Sub-Agents
 
-Sub-agents need access to the native `chorus` MCP server configured by the opencode-chorus plugin. If tools are missing, confirm `chorusUrl` and `apiKey` are configured for the OpenCode session.
+Sub-agents need access to the lazy Chorus bridge configured by the opencode-chorus plugin. If tools are missing, confirm `chorusUrl` and `apiKey` are configured for the OpenCode session, then use `chorus_tool_explore` to inspect real Chorus tools before executing them through `chorus_tool_execute`.
 
 ### Troubleshooting
 

@@ -3,19 +3,32 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
-import { createChorusRemoteMcpConfig } from "../../src/chorus/mcp-config"
-
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
+const toastCalls: Array<{ title?: string; message?: string; variant?: string }> = []
 let getCommentsResponse: unknown = { comments: [] }
 const chorusSkillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 let configDir = ""
 let previousConfigDir: string | undefined
 let previousChorusApiKey: string | undefined
+let listToolsCalls = 0
+let listToolsError: Error | undefined
 
 mock.module("../../src/chorus/mcp-client", () => ({
   ChorusMcpClient: class {
+    async listTools() {
+      listToolsCalls += 1
+      if (listToolsError) throw listToolsError
+      return [
+        {
+          name: "chorus_checkin",
+          description: "Check in to Chorus",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ]
+    }
+
     async callTool(name: string, args: Record<string, unknown> = {}) {
       toolCalls.push({ name, args })
       if (name === "chorus_checkin") {
@@ -56,7 +69,10 @@ describe("plugin hooks", () => {
     toolCalls.length = 0
     sessionCalls.length = 0
     logCalls.length = 0
+    toastCalls.length = 0
     getCommentsResponse = { comments: [] }
+    listToolsCalls = 0
+    listToolsError = undefined
     if (previousConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
     else process.env.OPENCODE_CONFIG_DIR = previousConfigDir
     if (previousChorusApiKey === undefined) delete process.env.CHORUS_API_KEY
@@ -686,7 +702,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("injects a native Chorus MCP server when runtime config is available", async () => {
+  it("does not inject a remote Chorus MCP server when runtime config is available", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -712,7 +728,6 @@ describe("plugin hooks", () => {
           url: "https://mcp.context7.com/mcp",
           enabled: true,
         },
-        chorus: createChorusRemoteMcpConfig("http://localhost:8637", "test-key"),
       })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -748,7 +763,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("does not overwrite an existing user-provided chorus MCP entry", async () => {
+  it("preserves an existing user-provided chorus MCP entry without adding one", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -796,7 +811,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("returns runtime hooks without plugin-defined wrapper tools when valid Chorus config is present", async () => {
+  it("returns lazy bridge tools when valid Chorus config is present", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -808,7 +823,71 @@ describe("plugin hooks", () => {
       expect(plugin.config).toBeFunction()
       expect(plugin.event).toBeFunction()
       expect(plugin["tool.execute.after"]).toBeFunction()
-      expect(plugin.tool).toBeUndefined()
+      expect(Object.keys(plugin.tool ?? {}).sort()).toEqual(["chorus_tool_execute", "chorus_tool_explore"])
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("refreshes the lazy bridge tool index on session startup", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-lazy" } } } } as never)
+
+      expect(listToolsCalls).toBe(1)
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("shows lazy bridge connection status through the OpenCode TUI on session startup", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never)
+
+      expect(toastCalls).toContainEqual(
+        expect.objectContaining({
+          title: "Chorus tools connected",
+          message: "1 tools available",
+          variant: "success",
+        }),
+      )
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not fail session startup when lazy bridge refresh fails", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+    listToolsError = new Error("MCP unavailable")
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await expect(
+        plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never),
+      ).resolves.toBeUndefined()
+      expect(logCalls).toContainEqual(
+        expect.objectContaining({
+          level: "warn",
+          message: "Failed to refresh Chorus lazy bridge on session startup",
+        }),
+      )
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -912,6 +991,11 @@ function createContext(directory: string) {
             message: input?.body?.message,
             extra: input?.body?.extra,
           })
+        },
+      },
+      tui: {
+        showToast: async (input: { body?: { title?: string; message?: string; variant?: string } }) => {
+          toastCalls.push(input.body ?? {})
         },
       },
       session: {

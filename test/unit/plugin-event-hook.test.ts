@@ -28,7 +28,7 @@ describe("plugin event hook", () => {
           stopCalls.push(sessionId)
         },
       } as never,
-      logger: { debug: async () => {}, info: async () => {} },
+      logger: { debug: async () => {}, info: async () => {}, warn: async () => {} },
     })
 
     await hook({ event: { type: "session.idle", properties: { info: { id: "runtime-1" } } } })
@@ -63,7 +63,7 @@ describe("plugin event hook", () => {
         heartbeat: async () => {},
         stop: async () => {},
       } as never,
-      logger: { debug: async () => {}, info: async () => {} },
+      logger: { debug: async () => {}, info: async () => {}, warn: async () => {} },
     })
 
     await hook({ event: { type: "session.created", properties: { info: { id: "runtime-2" } } } })
@@ -96,7 +96,7 @@ describe("plugin event hook", () => {
         heartbeat: async () => {},
         stop: async () => {},
       } as never,
-      logger: { debug: async () => {}, info: async () => {} },
+      logger: { debug: async () => {}, info: async () => {}, warn: async () => {} },
     })
 
     await hook({ event: { type: "session.updated", properties: { info: { id: "runtime-updated" } } } })

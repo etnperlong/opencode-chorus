@@ -96,11 +96,33 @@ export type OpenCodeState = {
   workers: Record<string, WorkerRecord>
   reviews: Record<string, ReviewRecord>
   sessionContext?: SessionContextRecord
+  lazyBridge?: LazyBridgeStatusRecord
   notificationQueue: QueuedNotification[]
   checkpoints: {
     lastUnreadBackfillAt?: string
     lastSharedSyncAt?: string
   }
+}
+
+export type LazyBridgeStatusRecord = {
+  status: "idle" | "connecting" | "connected" | "stale" | "error"
+  lastRefreshStartedAt?: string
+  lastRefreshSucceededAt?: string
+  lastRefreshFailedAt?: string
+  toolCount?: number
+  chorusUrl?: string
+  agent?: {
+    uuid?: string
+    name?: string
+    roles: string[]
+  }
+  scope?: {
+    projectUuid?: string
+    projectName?: string
+    projectGroupUuid?: string
+    projectGroupName?: string
+  }
+  lastError?: string
 }
 
 export type SharedState = {

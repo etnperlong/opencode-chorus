@@ -34,8 +34,28 @@ export function migrateOpenCodeState(input: unknown): OpenCodeState {
     workers: state.workers ?? {},
     reviews: state.reviews ?? {},
     sessionContext: isSessionContextRecord(state.sessionContext) ? state.sessionContext : undefined,
+    lazyBridge: isLazyBridgeStatusRecord(state.lazyBridge) ? sanitizeLazyBridgeStatus(state.lazyBridge) : undefined,
     notificationQueue: state.notificationQueue ?? [],
     checkpoints: state.checkpoints ?? {},
+  }
+}
+
+function isLazyBridgeStatusRecord(value: unknown): value is OpenCodeState["lazyBridge"] {
+  return isRecord(value) && typeof value.status === "string"
+}
+
+function sanitizeLazyBridgeStatus(value: OpenCodeState["lazyBridge"]): OpenCodeState["lazyBridge"] {
+  if (!value) return undefined
+  return {
+    status: value.status,
+    ...(typeof value.lastRefreshStartedAt === "string" ? { lastRefreshStartedAt: value.lastRefreshStartedAt } : {}),
+    ...(typeof value.lastRefreshSucceededAt === "string" ? { lastRefreshSucceededAt: value.lastRefreshSucceededAt } : {}),
+    ...(typeof value.lastRefreshFailedAt === "string" ? { lastRefreshFailedAt: value.lastRefreshFailedAt } : {}),
+    ...(typeof value.toolCount === "number" ? { toolCount: value.toolCount } : {}),
+    ...(typeof value.chorusUrl === "string" ? { chorusUrl: value.chorusUrl } : {}),
+    ...(value.agent ? { agent: value.agent } : {}),
+    ...(value.scope ? { scope: value.scope } : {}),
+    ...(typeof value.lastError === "string" ? { lastError: value.lastError } : {}),
   }
 }
 

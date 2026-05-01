@@ -35,6 +35,23 @@ describe("migrateOpenCodeState", () => {
     expect(result.mainSession.runtimeSessionId).toBe("runtime-1")
     expect(result.sessionContext).toBeUndefined()
   })
+
+  it("preserves lightweight lazy bridge status", () => {
+    const result = migrateOpenCodeState({
+      lazyBridge: {
+        status: "connected",
+        toolCount: 12,
+        chorusUrl: "http://localhost:8637",
+        inputSchema: { should: "not be required or persisted by bridge" },
+      },
+    })
+
+    expect(result.lazyBridge).toEqual({
+      status: "connected",
+      toolCount: 12,
+      chorusUrl: "http://localhost:8637",
+    })
+  })
 })
 
 describe("migrateSharedState", () => {
