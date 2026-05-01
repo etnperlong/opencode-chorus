@@ -93,7 +93,7 @@ These settings only control visibility and hints. They do not auto-claim tasks, 
 The plugin no longer injects a remote `mcp.chorus` server into OpenCode by default. Instead, it exposes two native bridge tools:
 
 - `chorus_tool_explore` searches or inspects real Chorus tools from the remote Chorus MCP server.
-- `chorus_tool_execute` executes a real Chorus tool by name after applying the plugin's argument-safety policy.
+- `chorus_tool_execute` executes a real Chorus tool by name (or its short alias) after applying the plugin's argument-safety policy.
 
 For example, to update a task status, first explore `chorus_update_task`, then execute it through the bridge. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
 

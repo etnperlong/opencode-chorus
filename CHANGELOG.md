@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.0 - 2026-05-01
+
+### Added
+
+- Added a lazy Chorus MCP bridge to dynamically discover and execute real Chorus tools.
+
+### Fixed
+
+- Exposed short Chorus tool aliases in the lazy bridge for improved usability.
+
 ## v0.2.0 - 2026-04-30
 
 ### Added
