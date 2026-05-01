@@ -9,8 +9,24 @@ describe("Chorus lazy bridge tools", () => {
 
     const result = await tools.chorus_tool_explore!.execute({ query: "update task", limit: 5 }, createToolContext())
 
-    expect(readOutput(result)).toContain("chorus_update_task")
+    expect(readOutput(result)).toContain("update_task")
+    expect(readOutput(result)).not.toContain("chorus_update_task")
     expect(readOutput(result)).toContain("Update a task")
+  })
+
+  it("inspects Chorus tools by their short alias", async () => {
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+    })
+
+    const result = await tools.chorus_tool_explore!.execute(
+      { toolName: "get_task", includeSchema: true },
+      createToolContext(),
+    )
+
+    expect(readOutput(result)).toContain("get_task")
+    expect(readOutput(result)).not.toContain("chorus_get_task")
+    expect(readOutput(result)).toContain("taskUuid")
   })
 
   it("records lightweight lazy bridge status without persisting schemas", async () => {
@@ -129,6 +145,24 @@ describe("Chorus lazy bridge tools", () => {
     const result = await tools.chorus_tool_execute!.execute(
       {
         toolName: "chorus_get_task",
+        arguments: { taskUuid: "task-1" },
+      },
+      createToolContext(),
+    )
+
+    expect(calls).toEqual([{ name: "chorus_get_task", args: { taskUuid: "task-1" } }])
+    expect(readOutput(result)).toContain("task-1")
+  })
+
+  it("executes a real Chorus tool when called by its short alias", async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(calls),
+    })
+
+    const result = await tools.chorus_tool_execute!.execute(
+      {
+        toolName: "get_task",
         arguments: { taskUuid: "task-1" },
       },
       createToolContext(),

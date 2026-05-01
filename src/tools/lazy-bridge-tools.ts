@@ -80,9 +80,10 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
       },
       async execute(args) {
         const index = await readToolIndex()
+        const requestedToolName = args.toolName ? resolveRealChorusToolName(index, args.toolName) : undefined
         const results = exploreTools(index, {
           query: args.query,
-          toolName: args.toolName,
+          toolName: requestedToolName,
           limit: args.limit,
           includeSchema: args.includeSchema,
         })
@@ -102,18 +103,19 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
       },
       async execute(args) {
         const index = await readToolIndex()
-        const target = index.find((item) => item.name === args.toolName)
+        const toolName = resolveRealChorusToolName(index, args.toolName)
+        const target = index.find((item) => item.name === toolName)
         if (!target) throw new Error(`Unknown Chorus tool: ${args.toolName}. Use chorus_tool_explore first.`)
 
         const policy = args.argumentPolicy === "raw" || args.argumentPolicy === "strict" ? args.argumentPolicy : "default"
         const normalizedArgs =
           policy === "raw"
             ? (args.arguments ?? {})
-            : normalizeToolArguments(args.toolName, args.arguments ?? {}, target.inputSchema)
+            : normalizeToolArguments(toolName, args.arguments ?? {}, target.inputSchema)
         const scope = await resolveChorusToolScope(options.stateStore)
-        const result = await options.chorusClient.callTool(args.toolName, normalizedArgs, scope)
+        const result = await options.chorusClient.callTool(toolName, normalizedArgs, scope)
         return formatToolResult(result, {
-          chorusToolName: args.toolName,
+          chorusToolName: toolName,
           argumentPolicy: policy,
         })
       },
@@ -172,7 +174,7 @@ function exploreTools(
 
   return {
     results: candidates.slice(0, options.limit ?? 5).map((item): ToolSearchResult => ({
-      toolName: item.name,
+      toolName: toPublicChorusToolName(item.name),
       description: item.description ?? "",
     })),
   }
@@ -184,7 +186,7 @@ function describeTool(toolDefinition: ChorusMcpToolDefinition, includeSchema: bo
     : []
   const properties = isRecord(toolDefinition.inputSchema.properties) ? Object.keys(toolDefinition.inputSchema.properties) : []
   return {
-    toolName: toolDefinition.name,
+    toolName: toPublicChorusToolName(toolDefinition.name),
     description: toolDefinition.description ?? "",
     requiredFields,
     optionalFields: properties.filter((property) => !requiredFields.includes(property)),
@@ -213,6 +215,16 @@ export function normalizeToolArguments(
   }
 
   return normalized
+}
+
+function resolveRealChorusToolName(index: ChorusMcpToolDefinition[], toolName: string): string {
+  if (index.some((item) => item.name === toolName)) return toolName
+  const prefixed = `chorus_${toolName}`
+  return index.some((item) => item.name === prefixed) ? prefixed : toolName
+}
+
+function toPublicChorusToolName(toolName: string): string {
+  return toolName.startsWith("chorus_") ? toolName.slice("chorus_".length) : toolName
 }
 
 function formatToolResult(value: unknown, metadata?: Record<string, unknown>): ToolResult {
