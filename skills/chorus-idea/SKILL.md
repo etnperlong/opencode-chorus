@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: ideation
-  role: pm-agent
+  role: idea:write
   audience: opencode-agents
   source: chorus-plugin
   keywords: idea,elaboration,requirements,questions,owner-confirmation,pm-workflow
@@ -29,7 +29,7 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore`
 
 ## Overview
 
-Ideas are the starting point of the AI-DLC pipeline. Humans (or Admin agents) create Ideas describing what they need. The PM Agent claims an Idea, runs elaboration to clarify requirements, and then moves on to `chorus-proposal` to create a Proposal with document and task drafts.
+Ideas are the starting point of the AI-DLC pipeline. Humans, or agents with `task:admin`, create Ideas describing what they need. An agent with `idea:write` claims an Idea, runs elaboration to clarify requirements, and then moves on to `chorus-proposal` to create a Proposal with document and task drafts.
 
 **Idea status lifecycle (3 stored states):**
 
@@ -159,7 +159,7 @@ chorus_pm_skip_elaboration({
      questions: [
        {
          id: "q1",
-         text: "What user roles should have access to this feature?",
+          text: "What permission level should this feature require?",
          category: "functional",
          options: [
            { id: "a", label: "All users" },
@@ -251,10 +251,10 @@ chorus_pm_skip_elaboration({
      ideaUuid: "<idea-uuid>",
      roundUuid: "<round-uuid>",
      issues: [
-       { questionId: "q1", type: "ambiguity", description: "Role-based access selected but no roles defined" }
+        { questionId: "q1", type: "ambiguity", description: "Permission-based access selected but no permissions defined" }
      ],
      followUpQuestions: [
-       { id: "fq1", text: "Which specific roles should have access?", category: "functional", options: [...] }
+        { id: "fq1", text: "Which specific permissions are required?", category: "functional", options: [...] }
      ]
    })
    ```

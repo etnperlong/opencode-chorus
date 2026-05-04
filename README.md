@@ -4,6 +4,8 @@ The [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for Open
 
 This plugin connects OpenCode to your Chorus instance, letting you manage proposals, execute tasks, and run the AI-DLC pipeline.
 
+Current plugin release: `v0.3.1`. This release is compatible with the Chorus `v0.7.0` permission model.
+
 ## Changelog
 
 Release notes are tracked in [CHANGELOG.md](./CHANGELOG.md).
@@ -50,6 +52,8 @@ Edit your OpenCode config file (usually `~/.config/opencode/config.json`) to inc
 ### 2. Configure Credentials
 
 The plugin needs to know where your Chorus server is and how to authenticate. The easiest way to configure this is using environment variables.
+
+The Chorus API key should include the permissions required by the workflows you plan to run. For example, read-only overview and search flows need `task:read`, task execution needs `task:write`, proposal work needs `proposal:write`, idea elaboration needs `idea:write`, and verification or governance flows need `task:admin`.
 
 Set these in your terminal before running OpenCode:
 
@@ -101,4 +105,4 @@ For example, to update a task status, first explore `chorus_update_task`, then e
 
 After installing the plugin and setting your credentials, restart OpenCode.
 
-You will see the Chorus skills in your workspace. Start by asking OpenCode to use the `chorus` skill for an overview, or run a specific stage like `chorus-idea` or `chorus-yolo`.
+You will see the Chorus skills in your workspace. Start by asking OpenCode to use the `chorus` skill to inspect available permissions and route into the right workflow, or run a specific stage like `chorus-idea` or `chorus-yolo`.

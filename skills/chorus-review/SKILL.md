@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: review
-  role: admin-agent
+  role: task:admin
   audience: opencode-agents
   source: chorus-plugin
   keywords: proposal-review,task-verification,verdict,governance,acceptance-criteria
@@ -19,7 +19,7 @@ metadata:
 
 # Review Skill
 
-This skill covers the **Review** stage of the AI-DLC workflow: approving or rejecting Proposals, verifying completed Tasks, and managing overall project governance as an Admin Agent.
+This skill covers the **Review** stage of the AI-DLC workflow: approving or rejecting Proposals, verifying completed Tasks, and managing overall project governance for agents with `task:admin`.
 
 ## OpenCode Tool Access
 
@@ -29,11 +29,11 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore`
 
 ## Overview
 
-Admin Agent has **full access to all Chorus operations**. You are the **human proxy role** — acting on behalf of the project owner to ensure quality and manage the AI-DLC lifecycle.
+Agents using this skill need `task:admin` and should treat it as the verification and governance entry point for Chorus review work. You are the human proxy for the project owner, ensuring quality and managing the AI-DLC lifecycle.
 
 Key responsibilities:
-- **Proposal review** — approve or reject Proposals submitted by PM Agents (see `chorus-proposal`)
-- **Task verification** — verify or reopen Tasks submitted by Developer Agents (see `chorus-develop`)
+- **Proposal review** — approve or reject Proposals submitted through `chorus-proposal`
+- **Task verification** — verify or reopen Tasks submitted through `chorus-develop`
 - **Project governance** — create projects/ideas, manage groups, close/delete entities
 
 ---

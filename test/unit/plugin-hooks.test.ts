@@ -34,7 +34,7 @@ mock.module("../../src/chorus/mcp-client", () => ({
       if (name === "chorus_checkin") {
         return {
           session: { uuid: "chorus-session-1" },
-          agent: { uuid: "agent-1", name: "OpenCode", roles: ["developer"] },
+          agent: { uuid: "agent-1", name: "OpenCode", permissions: ["task:read", "task:write"] },
           projects: [{ uuid: "project-1", name: "OpenCode-Chorus", taskCount: 2, pendingProposalCount: 1 }],
           notifications: [{ uuid: "notification-1" }],
         }
@@ -139,6 +139,11 @@ describe("plugin hooks", () => {
       expect(state.sessionContext).toMatchObject({
         source: "chorus_checkin",
         runtimeSessionId: "session-context",
+        agent: {
+          uuid: "agent-1",
+          name: "OpenCode",
+          permissions: ["task:read", "task:write"],
+        },
         projects: [{ uuid: "project-1", name: "OpenCode-Chorus" }],
       })
       expect(logCalls.some((call) => call.message?.startsWith("Chorus context:"))).toBe(false)

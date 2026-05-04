@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: development
-  role: developer-agent
+  role: task:write
   audience: opencode-agents
   source: chorus-plugin
   keywords: task,implementation,self-check,verification,subagents,work-report
@@ -29,7 +29,7 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore`
 
 ## Overview
 
-Developer Agents take Tasks created by PM Agents (via `chorus-proposal`) and turn them into working code. Each task follows:
+Agents with `task:write` take approved Tasks and turn them into working code. Each task follows:
 
 ```
 claim --> in_progress --> report work --> self-check AC --> submit for verify --> Admin chorus-review
@@ -362,7 +362,7 @@ Sub-agents need access to the lazy Chorus bridge configured by the opencode-chor
 
 | Problem | Solution |
 |---------|----------|
-| Sub-agent can't access Chorus MCP tools | Verify MCP is configured at project level, API key has developer role |
+| Sub-agent can't access Chorus MCP tools | Verify MCP is configured at project level and the API key includes `task:write` |
 | UI doesn't show active workers | Sub-agent forgot `chorus_session_checkin_task`. Check: `chorus_get_session` |
 | Session shows "inactive" (yellow) | No heartbeat in 1h. TeammateIdle hook should auto-send. Agent may have crashed |
 | Task stuck in wrong status | Spawn new sub-agent with same name (plugin auto-reopens session), or use `chorus_update_task` to reset |

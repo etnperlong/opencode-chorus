@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: planning
-  role: pm-agent
+  role: proposal:write
   audience: opencode-agents
   source: chorus-plugin
   keywords: proposal,prd,tech-design,task-drafts,dependency-dag,acceptance-criteria
@@ -29,7 +29,7 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore`
 
 ## Overview
 
-After an Idea's elaboration is resolved (see `chorus-idea`), the PM Agent creates a Proposal — a container that holds document drafts and task drafts. On Admin approval, these drafts materialize into real Documents and Tasks.
+After an Idea's elaboration is resolved (see `chorus-idea`), an agent with `proposal:write` creates a Proposal — a container that holds document drafts and task drafts. On `task:admin` approval, these drafts materialize into real Documents and Tasks.
 
 ```
 Elaboration resolved --> Create Proposal --> Add drafts --> Validate --> Submit --> Admin chorus-review
@@ -68,7 +68,7 @@ Elaboration resolved --> Create Proposal --> Add drafts --> Validate --> Submit 
 | Tool | Purpose |
 |------|---------|
 | `chorus_pm_create_tasks` | Batch create tasks (supports intra-batch dependencies via draftUuid) |
-| `chorus_pm_assign_task` | Assign a task to a Developer Agent |
+| `chorus_pm_assign_task` | Assign a task to an agent with `task:write` |
 | `chorus_pm_create_document` | Create standalone document |
 | `chorus_pm_update_document` | Update document content (increments version) |
 | `chorus_add_task_dependency` | Add dependency between existing tasks (with cycle detection) |
@@ -271,14 +271,14 @@ chorus_remove_task_dependency({ taskUuid: "<task-B-uuid>", dependsOnTaskUuid: "<
 
 Dependencies are validated: same project, no self-dependency, no cycles (DFS detection).
 
-### Step 9: Assign Tasks to Developer Agents (Optional)
+### Step 9: Assign Tasks to Agents With `task:write` (Optional)
 
 ```
 chorus_pm_assign_task({ taskUuid: "<task-uuid>", agentUuid: "<developer-agent-uuid>" })
 ```
 
 - Task must be `open` or `assigned`
-- Target agent must have `developer` or `developer_agent` role
+- Target agent must have the `task:write` permission
 
 ---
 
@@ -299,7 +299,7 @@ Why this feature is needed.
 - NFR-1: ...
 
 ## User Stories
-- As a <role>, I want <action>, so that <benefit>
+- As a user persona, I want an action, so that I get a benefit
 
 ## Out of Scope
 What is NOT included.

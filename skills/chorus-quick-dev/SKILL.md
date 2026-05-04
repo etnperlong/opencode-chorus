@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: quick-development
-  role: admin-or-developer-agent
+  role: task:write
   audience: opencode-agents
   source: chorus-plugin
   keywords: quick-task,hotfix,acceptance-criteria,self-verify,small-change
@@ -32,7 +32,7 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore`
 The standard AI-DLC flow ensures quality through structured planning, but adds overhead that slows down small tasks. Quick Dev provides a lightweight alternative:
 
 ```
-[check admin role] → chorus_create_tasks → chorus_claim_task → in_progress → report → self-check AC → submit for verify → [self-verify if admin] → done
+[check task:admin permission] → chorus_create_tasks → chorus_claim_task → in_progress → report → self-check AC → submit for verify → [self-verify if `task:admin`] → done
 ```
 
 **Use Quick Dev when:**
@@ -54,7 +54,7 @@ For complex work, use `chorus-idea` + `chorus-proposal` instead.
 
 ## Pre-Flight: Admin Self-Verify Check
 
-**Before creating tasks**, if you have the `admin_agent` role, ask the user:
+**Before creating tasks**, if your API key includes `task:admin`, ask the user:
 
 > "I have admin privileges. After development, should I verify the task myself, or leave it for another admin to verify?"
 
@@ -168,7 +168,7 @@ chorus_submit_for_verify({
 
 In OpenCode, `chorus_submit_for_verify` auto-launches `task-reviewer` when reviewer gating is enabled and waits for the current VERDICT or timeout before returning. See `chorus-develop` for full reviewer-gate handling.
 
-**Admin self-verification:** If you have the `admin_agent` role and the user approved self-verification in the Pre-Flight check, you can verify the task yourself immediately after submitting:
+**Admin self-verification:** If your API key includes `task:admin` and the user approved self-verification in the Pre-Flight check, you can verify the task yourself immediately after submitting:
 
 ```
 chorus_admin_verify_task({ taskUuid: "<task-uuid>" })

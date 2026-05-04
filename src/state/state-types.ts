@@ -45,17 +45,22 @@ export type ReviewRecord = {
   blockersSnapshot: string[]
 }
 
+export type AgentPermissionsRecord = Record<string, boolean>
+
+export type SessionContextAgentRecord = {
+  uuid?: string
+  name?: string
+  permissions?: string[] | AgentPermissionsRecord
+  roles?: string[]
+}
+
 export type SessionContextRecord = {
   source: "chorus_checkin"
   runtimeSessionId: string
   lastRefreshedAt: string
   lastSurfacedAt?: string
   lastSurfacedRuntimeSessionId?: string
-  agent?: {
-    uuid?: string
-    name?: string
-    roles: string[]
-  }
+  agent?: SessionContextAgentRecord
   owner?: {
     uuid?: string
     name?: string

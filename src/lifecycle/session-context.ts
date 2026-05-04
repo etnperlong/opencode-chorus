@@ -23,11 +23,30 @@ export function formatSessionContextSummary(context: SessionContextRecord): stri
 
 function readAgent(value: unknown): SessionContextRecord["agent"] {
   if (!isRecord(value)) return undefined
+  const permissions = readPermissions(value.permissions)
+  const roles = Array.isArray(value.roles) ? value.roles.map(String) : undefined
+
   return {
     ...(typeof value.uuid === "string" ? { uuid: value.uuid } : {}),
     ...(typeof value.name === "string" ? { name: value.name } : {}),
-    roles: Array.isArray(value.roles) ? value.roles.map(String) : [],
+    ...(permissions !== undefined ? { permissions } : {}),
+    ...(roles !== undefined ? { roles } : {}),
   }
+}
+
+function readPermissions(value: unknown): SessionContextRecord["agent"] extends infer T
+  ? T extends { permissions?: infer P }
+    ? P | undefined
+    : never
+  : never {
+  if (Array.isArray(value)) return value.map(String)
+  if (!isRecord(value)) return undefined
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, allowed]) => typeof allowed === "boolean")
+      .map(([permission, allowed]) => [permission, allowed]),
+  ) as Record<string, boolean>
 }
 
 function readNamedEntity(value: unknown): { uuid?: string; name?: string } | undefined {

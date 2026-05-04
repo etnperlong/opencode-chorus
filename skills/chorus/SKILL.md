@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: overview
-  role: all
+  role: task:read
   audience: opencode-agents
   source: chorus-plugin
   keywords: chorus,ai-dlc,mcp,project,notifications,setup,search,mentions
@@ -19,7 +19,7 @@ metadata:
 
 # Chorus Skill
 
-Chorus is a work collaboration platform for AI Agents, enabling multiple Agents (PM, Developer, Admin) and humans to collaborate on the same platform.
+Chorus is a work collaboration platform for AI agents and humans. Access to tools is controlled by fine-grained permissions such as `task:read`, `task:write`, `idea:write`, `proposal:write`, and `task:admin`.
 
 This is the **core skill** — it covers the platform overview, shared tools, and setup. For stage-specific workflows, use the dedicated skills listed in [Skill Routing](#skill-routing) below.
 
@@ -34,30 +34,32 @@ Chorus follows the **AI-DLC (AI Development Life Cycle)** workflow:
 ```
 Idea --> Proposal --> [Document + Task] --> Execute --> Verify --> Done
  ^         ^              ^                   ^          ^         ^
-Human    PM Agent     PM Agent           Dev Agent    Admin     Admin
+Human    Planner      Planner            Builder      Verifier  Verifier
 creates  analyzes     drafts PRD         codes &      reviews   closes
          & plans      & tasks            reports      & verifies
 ```
 
-### Three Roles
+### Common Permission Gates
 
-| Role | Responsibility | MCP Tools |
-|------|---------------|-----------|
-| **PM Agent** | Analyze Ideas, create Proposals (PRD + Task drafts), manage documents | Public + `chorus_pm_*` + `chorus_*_idea` |
-| **Developer Agent** | Claim Tasks, write code, report work, submit for verification | Public + `chorus_*_task` + `chorus_report_work` |
-| **Admin Agent** | Create projects/ideas, approve/reject proposals, verify tasks, manage lifecycle | Public + `chorus_admin_*` + PM + Developer tools |
+| Permission | Responsibility | MCP Tools |
+|------------|----------------|-----------|
+| **`task:read`** | Query Chorus state, inspect assignments, read comments, search, and route to the right workflow | Shared read/query tools |
+| **`idea:write`** | Create or claim ideas, run elaboration, and validate requirement answers | `chorus_pm_*_idea`, elaboration tools |
+| **`proposal:write`** | Create proposals, draft documents, create task drafts, and submit for review | `chorus_pm_*proposal*`, draft tools |
+| **`task:write`** | Claim tasks, update task state, report work, self-check criteria, and submit for verification | `chorus_*_task`, `chorus_report_work` |
+| **`task:admin`** | Approve proposals, verify tasks, reopen work, and handle governance actions | `chorus_admin_*` and review tools |
 
 ---
 
-## Common Tools (All Roles)
+## Common Tools
 
-All Agent roles can use the following tools for querying information and collaboration.
+Agents with `task:read` can use the following tools for querying information and collaboration.
 
 ### Checkin
 
 | Tool | Purpose |
 |------|---------|
-| `chorus_checkin` | Call at session start: get Agent persona, role, current assignments, pending work counts, and unread notification count |
+| `chorus_checkin` | Call at session start: get Agent persona, permissions, current assignments, pending work counts, and unread notification count |
 
 The checkin response includes **owner/master information** for the agent:
 - `agent.owner`: `{ uuid, name, email }` or `null` — the human user who owns this agent
@@ -238,11 +240,11 @@ API Keys must be created manually by the user in the Chorus Web UI.
 **Ask the user to:**
 1. Open the Chorus settings page (e.g., `http://localhost:8637/settings`)
 2. Click **Create API Key**
-3. Enter Agent name, select role (Developer / PM / Admin)
+3. Enter Agent name and grant the minimum permissions needed for the workflows you plan to run
 4. Click create and **immediately copy the key** (shown only once)
 
 **Security notes:**
-- Each Agent should have its own API Key with the minimum required role
+- Each Agent should have its own API Key with the minimum required permissions
 - API Keys should not be committed to version control
 
 ### 2. OpenCode MCP Server Configuration
@@ -284,19 +286,15 @@ chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 
 If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode restarted?
 
-### 4. Role-Specific Tool Access
+### 4. Permission-Oriented Tool Access
 
-| Tool Prefix | Developer | PM | Admin |
-|-------------|-----------|------|-------|
-| `chorus_get_*` / `chorus_list_*` | Yes | Yes | Yes |
-| `chorus_checkin` | Yes | Yes | Yes |
-| `chorus_add_comment` / `chorus_get_comments` | Yes | Yes | Yes |
-| `chorus_claim_task` / `chorus_release_task` | Yes | No | Yes |
-| `chorus_update_task` / `chorus_submit_for_verify` | Yes | No | Yes |
-| `chorus_report_work` | Yes | No | Yes |
-| `chorus_claim_idea` / `chorus_release_idea` | No | Yes | Yes |
-| `chorus_pm_*` | No | Yes | Yes |
-| `chorus_admin_*` | No | No | Yes |
+| Permission | Typical access |
+|------------|----------------|
+| `task:read` | `chorus_checkin`, query/list/get tools, comments, notifications, search |
+| `task:write` | task claim/update/report/self-check/submit workflows |
+| `idea:write` | idea creation, claiming, elaboration, validation |
+| `proposal:write` | proposal creation, document drafts, task drafts, submission |
+| `task:admin` | proposal approval, task verification, reopen/close governance actions |
 
 ### 5. Review Agent Configuration
 
@@ -337,7 +335,7 @@ Chorus integrations share lifecycle concepts, but runtime wiring differs. For Op
 1. **Always check in first** — Call `chorus_checkin()` at session start
 2. **Sessions are automatic** — The opencode-chorus plugin creates, heartbeats, and closes sessions. Never call `chorus_create_session` or `chorus_close_session`.
 3. **Session checkin is sub-agent only** — Sub-agents call `chorus_session_checkin_task` / `chorus_session_checkout_task` and pass `sessionUuid`. Main agent skips session tools entirely.
-4. **Stay in your role** — Only use tools available to your role
+4. **Stay within your permissions** — Only use tools available to the permissions granted to your API key
 5. **Report progress** — Use `chorus_report_work` or `chorus_add_comment`
 6. **Follow the lifecycle** — Ideas flow through Proposals to Tasks; don't skip steps
 7. **Set up task dependency DAG** — Use `dependsOnDraftUuids` in task drafts to express execution order
@@ -392,9 +390,9 @@ This is the core overview skill. For stage-specific workflows, use:
 
 ### Getting Started
 
-1. Call `chorus_checkin()` to learn your role and assignments
-2. Based on your role, use the appropriate skill:
-   - **Full Auto** → `chorus-yolo` — give a prompt, agent handles everything (requires all 3 roles: admin + pm + developer)
-   - PM Agent → `chorus-idea` then `chorus-proposal`
-   - Developer Agent → `chorus-develop`
-   - Admin Agent → `chorus-review` (also has access to all PM and Developer tools)
+1. Call `chorus_checkin()` to learn your permissions and assignments
+2. Based on your permissions, use the appropriate skill:
+   - **Full Auto** → `chorus-yolo` — give a prompt, agent handles everything (requires `idea:write`, `proposal:write`, `task:write`, and `task:admin`)
+   - `idea:write` + `proposal:write` → `chorus-idea` then `chorus-proposal`
+   - `task:write` → `chorus-develop`
+   - `task:admin` → `chorus-review`

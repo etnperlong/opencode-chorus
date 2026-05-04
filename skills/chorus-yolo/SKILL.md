@@ -9,7 +9,7 @@ metadata:
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: full-auto
-  role: all-roles
+  role: idea:write
   audience: opencode-agents
   source: chorus-plugin
   keywords: full-auto,ai-dlc,proposal-reviewer,task-reviewer,waves,autonomous
@@ -65,27 +65,30 @@ chorus-yolo <prompt>
 
 ## Prerequisites
 
-**All 3 agent roles are required on the API key:**
+**This workflow requires multiple permissions on the API key:**
 
-| Role | Why |
-|------|-----|
-| `pm_agent` | Idea creation, elaboration, proposal management (`chorus_pm_*` tools) |
-| `admin_agent` | Proposal approval, task verification (`chorus_admin_*` tools) |
-| `developer_agent` | Sub-agents claim and execute tasks (`chorus_claim_task`, `chorus_update_task`) |
+| Permission | Why |
+|------------|-----|
+| `idea:write` | Idea creation and elaboration |
+| `proposal:write` | Proposal creation and draft management |
+| `task:write` | Task claiming, execution, and submission |
+| `task:admin` | Proposal approval and task verification |
 
-Sub-agents share the same API key as the main agent. The plugin injects session info into sub-agents, but **roles come from the API key itself**, not from hook injection.
+Sub-agents share the same API key as the main agent. The plugin injects session info into sub-agents, but the granted permissions come from the API key itself, not from hook injection.
 
 **Check at startup:**
 
 ```
 result = chorus_checkin()
-roles = result.agent.roles
+permissions = result.agent.permissions ?? {}
 
-required = ["pm_agent", "admin_agent", "developer_agent"]
-missing = [r for r in required if r not in roles]
+required = ["idea:write", "proposal:write", "task:write", "task:admin"]
+missing = required.filter((permission) =>
+  Array.isArray(permissions) ? !permissions.includes(permission) : permissions[permission] !== true,
+)
 
 if missing:
-  ABORT: "Cannot run chorus-yolo. Missing required roles: {missing}. Your API key must have all 3 roles: pm_agent, admin_agent, developer_agent."
+  ABORT: "Cannot run chorus-yolo. Missing required permissions: {missing}. Your API key must include idea:write, proposal:write, task:write, and task:admin."
 ```
 
 ---
@@ -455,7 +458,7 @@ After all waves complete, output a markdown summary:
 
 | Scenario | Action |
 |----------|--------|
-| Missing roles at startup | Abort with message listing all 3 required roles and which are missing |
+| Missing permissions at startup | Abort with message listing the required permissions and which are missing |
 | Project creation fails | Report error, suggest user create project manually and retry with `--project` |
 | Proposal reviewer FAIL after maxRounds | Stop pipeline, report persisting BLOCKERs, suggest manual review |
 | Task reviewer FAIL after maxRounds | Flag task as escalation-needed, continue with other tasks |
@@ -471,7 +474,7 @@ After all waves complete, output a markdown summary:
 - Watch the wave count -- if tasks keep getting reopened, consider Ctrl+C and manually reviewing the feedback
 - All audit trail is preserved: elaboration Q&A, reviewer VERDICTs, work reports. Check Chorus UI for full history
 - For small/simple tasks, consider `chorus-quick-dev` instead -- it skips the Idea->Proposal overhead
-- Sub-agents share your API key; ensure it has all 3 roles before starting
+- Sub-agents share your API key; ensure it includes `idea:write`, `proposal:write`, `task:write`, and `task:admin` before starting
 
 ---
 

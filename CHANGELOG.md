@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.1 - 2026-05-02
+
+### Changed
+
+- Updated the plugin's stored Chorus session context to prefer `agent.permissions` while still accepting legacy `roles` payloads.
+- Migrated bundled skill metadata and workflow guidance from role labels to single-permission access labels such as `task:read`, `task:write`, `idea:write`, `proposal:write`, and `task:admin`.
+- Kept the plugin release version separate from the upstream Chorus compatibility version; this release targets plugin version `v0.3.1` with Chorus `v0.7.0` compatibility.
+
+### Fixed
+
+- Fixed the OpenCode documentation so API-key setup guidance matches the Chorus v0.7.0 permission model.
+
 ## v0.3.0 - 2026-05-01
 
 ### Added

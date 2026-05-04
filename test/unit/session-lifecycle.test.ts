@@ -55,12 +55,17 @@ describe("SessionLifecycle", () => {
     }
   })
 
-  it("records compact session context from chorus_checkin", async () => {
+  it("records compact session context from chorus_checkin when permissions are present", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-"))
     const stateStore = new StateStore(rootDir, ".chorus")
     await stateStore.init()
     const chorusClient = new FakeChorusClient({
-      agent: { uuid: "agent-1", name: "OpenCode", roles: ["developer"] },
+      agent: {
+        uuid: "agent-1",
+        name: "OpenCode",
+        permissions: { "task:read": true, "task:write": true, "task:admin": false },
+        roles: ["developer"],
+      },
       owner: { uuid: "user-1", name: "etnperlong" },
       projects: [
         {
@@ -81,7 +86,12 @@ describe("SessionLifecycle", () => {
       expect(state.sessionContext).toMatchObject({
         source: "chorus_checkin",
         runtimeSessionId: "s-context",
-        agent: { uuid: "agent-1", name: "OpenCode", roles: ["developer"] },
+        agent: {
+          uuid: "agent-1",
+          name: "OpenCode",
+          permissions: { "task:read": true, "task:write": true, "task:admin": false },
+          roles: ["developer"],
+        },
         owner: { uuid: "user-1", name: "etnperlong" },
         projects: [
           {
@@ -95,6 +105,29 @@ describe("SessionLifecycle", () => {
       })
       expect(state.sessionContext?.lastRefreshedAt).toBeDefined()
       expect(state.sessionContext?.lastSurfacedAt).toBeUndefined()
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("keeps legacy roles when chorus_checkin does not include permissions", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-"))
+    const stateStore = new StateStore(rootDir, ".chorus")
+    await stateStore.init()
+    const chorusClient = new FakeChorusClient({
+      agent: { uuid: "agent-1", name: "OpenCode", roles: ["developer"] },
+    })
+    const lifecycle = new SessionLifecycle(stateStore, chorusClient as never, "http://localhost:8637")
+
+    try {
+      await lifecycle.start("s-legacy")
+
+      const state = await stateStore.readOpenCodeState()
+      expect(state.sessionContext?.agent).toEqual({
+        uuid: "agent-1",
+        name: "OpenCode",
+        roles: ["developer"],
+      })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -127,7 +160,7 @@ describe("SessionLifecycle", () => {
         source: "chorus_checkin",
         runtimeSessionId: "s-summary",
         lastRefreshedAt: "2026-01-01T00:00:00.000Z",
-        agent: { name: "OpenCode", roles: ["developer"] },
+        agent: { name: "OpenCode", permissions: ["task:read", "task:write"] },
         projects: [{ uuid: "project-1", name: "OpenCode-Chorus", taskCount: 3, pendingProposalCount: 1 }],
         notifications: { unread: 2 },
       },

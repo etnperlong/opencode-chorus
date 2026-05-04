@@ -21,58 +21,58 @@ const expectedMetadata: Record<
 > = {
   chorus: {
     workflow: "overview",
-    role: "all",
+    role: "task:read",
     keywords: "chorus,ai-dlc,mcp,project,notifications,setup,search,mentions",
     tools: "chorus_checkin,chorus_get_notifications,chorus_search,chorus_search_mentionables",
-    sentinels: ["## Common Tools", "## Skill Routing", "AI-DLC"],
+    sentinels: ["## Common Tools", "## Skill Routing", "task:read"],
   },
   "chorus-develop": {
     workflow: "development",
-    role: "developer-agent",
+    role: "task:write",
     keywords: "task,implementation,self-check,verification,subagents,work-report",
     tools:
       "chorus_claim_task,chorus_update_task,chorus_report_work,chorus_report_criteria_self_check,chorus_submit_for_verify",
-    sentinels: ["## Tools", "## Workflow", "VERDICT:", "OpenCode subagents"],
+    sentinels: ["## Tools", "## Workflow", "task:write", "OpenCode subagents"],
   },
   "chorus-idea": {
     workflow: "ideation",
-    role: "pm-agent",
+    role: "idea:write",
     keywords: "idea,elaboration,requirements,questions,owner-confirmation,pm-workflow",
     tools:
       "chorus_claim_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration",
-    sentinels: ["## Tools", "## Workflow", "elaboration", "question"],
+    sentinels: ["## Tools", "## Workflow", "idea:write", "question"],
   },
   "chorus-proposal": {
     workflow: "planning",
-    role: "pm-agent",
+    role: "proposal:write",
     keywords: "proposal,prd,tech-design,task-drafts,dependency-dag,acceptance-criteria",
     tools:
       "chorus_pm_create_proposal,chorus_pm_add_document_draft,chorus_pm_add_task_draft,chorus_pm_submit_proposal",
-    sentinels: ["## Tools", "## Workflow", "dependency", "Task Writing Guidelines"],
+    sentinels: ["## Tools", "## Workflow", "proposal:write", "Task Writing Guidelines"],
   },
   "chorus-quick-dev": {
     workflow: "quick-development",
-    role: "admin-or-developer-agent",
+    role: "task:write",
     keywords: "quick-task,hotfix,acceptance-criteria,self-verify,small-change",
     tools:
       "chorus_create_tasks,chorus_claim_task,chorus_report_work,chorus_submit_for_verify,chorus_admin_verify_task",
-    sentinels: ["## Workflow", "acceptanceCriteriaItems", "self-verification"],
+    sentinels: ["## Workflow", "task:admin", "self-verification"],
   },
   "chorus-review": {
     workflow: "review",
-    role: "admin-agent",
+    role: "task:admin",
     keywords: "proposal-review,task-verification,verdict,governance,acceptance-criteria",
     tools:
       "chorus_admin_approve_proposal,chorus_pm_reject_proposal,chorus_mark_acceptance_criteria,chorus_admin_verify_task,chorus_admin_reopen_task",
-    sentinels: ["## Tools", "## Review Strategy", "VERDICT:", "Governance Principles"],
+    sentinels: ["## Tools", "## Review Strategy", "task:admin", "Governance Principles"],
   },
   "chorus-yolo": {
     workflow: "full-auto",
-    role: "all-roles",
+    role: "idea:write",
     keywords: "full-auto,ai-dlc,proposal-reviewer,task-reviewer,waves,autonomous",
     tools:
       "chorus_admin_create_project,chorus_pm_create_idea,chorus_pm_create_proposal,chorus_pm_submit_proposal,chorus_admin_approve_proposal,chorus_submit_for_verify,chorus_admin_verify_task",
-    sentinels: ["Full-auto AI-DLC", "## Workflow", "Phase 1: Planning", "Wave-based"],
+    sentinels: ["Full-auto AI-DLC", "## Workflow", "idea:write", "Wave-based"],
   },
 }
 
