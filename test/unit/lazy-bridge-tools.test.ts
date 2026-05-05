@@ -2,31 +2,39 @@ import { describe, expect, it } from "bun:test"
 import { createChorusLazyBridge, createChorusLazyBridgeTools } from "../../src/tools/lazy-bridge-tools"
 
 describe("Chorus lazy bridge tools", () => {
-  it("explores Chorus tools from the dynamic MCP tool list", async () => {
+  it("lists Chorus tools from the dynamic MCP tool list", async () => {
     const tools = createChorusLazyBridgeTools({
       chorusClient: createClient(),
     })
 
-    const result = await tools.chorus_tool_explore!.execute({ query: "update task", limit: 5 }, createToolContext())
+    const result = await tools.chorus_tools!.execute({}, createToolContext())
 
-    expect(readOutput(result)).toContain("update_task")
-    expect(readOutput(result)).not.toContain("chorus_update_task")
+    expect(readOutput(result)).toContain('"total": 3')
+    expect(readOutput(result)).toContain('"name": "chorus_update_task"')
+    expect(readOutput(result)).toContain("chorus_update_task")
     expect(readOutput(result)).toContain("Update a task")
   })
 
-  it("inspects Chorus tools by their short alias", async () => {
+  it("gets Chorus tool details by raw Chorus tool name", async () => {
     const tools = createChorusLazyBridgeTools({
       chorusClient: createClient(),
     })
 
-    const result = await tools.chorus_tool_explore!.execute(
-      { toolName: "get_task", includeSchema: true },
-      createToolContext(),
-    )
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_get_task" }, createToolContext())
 
-    expect(readOutput(result)).toContain("get_task")
-    expect(readOutput(result)).not.toContain("chorus_get_task")
+    expect(readOutput(result)).toContain("chorus_get_task")
     expect(readOutput(result)).toContain("taskUuid")
+    expect(readOutput(result)).not.toContain("inputSchema")
+  })
+
+  it("fails strict tool lookup when a Chorus tool name does not exist", async () => {
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+    })
+
+    await expect(tools.chorus_tool_get!.execute({ toolName: "write a task update tool" }, createToolContext())).rejects.toThrow(
+      'Tool "write a task update tool" not found. Call \`chorus_tools\` first to list available tools.',
+    )
   })
 
   it("records lightweight lazy bridge status without persisting schemas", async () => {
@@ -43,7 +51,7 @@ describe("Chorus lazy bridge tools", () => {
       chorusUrl: "http://localhost:8637",
     })
 
-    await tools.chorus_tool_explore!.execute({ query: "task", limit: 5 }, createToolContext())
+    await tools.chorus_tools!.execute({}, createToolContext())
 
     expect(stateUpdates.at(-1)).toEqual({
       lazyBridge: expect.objectContaining({
@@ -154,22 +162,14 @@ describe("Chorus lazy bridge tools", () => {
     expect(readOutput(result)).toContain("task-1")
   })
 
-  it("executes a real Chorus tool when called by its short alias", async () => {
-    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+  it("rejects short aliases and requires raw Chorus tool names", async () => {
     const tools = createChorusLazyBridgeTools({
-      chorusClient: createClient(calls),
+      chorusClient: createClient(),
     })
 
-    const result = await tools.chorus_tool_execute!.execute(
-      {
-        toolName: "get_task",
-        arguments: { taskUuid: "task-1" },
-      },
-      createToolContext(),
+    await expect(tools.chorus_tool_execute!.execute({ toolName: "get_task", arguments: { taskUuid: "task-1" } }, createToolContext())).rejects.toThrow(
+      'Tool "get_task" not found. Call `chorus_tools` first to list available tools.',
     )
-
-    expect(calls).toEqual([{ name: "chorus_get_task", args: { taskUuid: "task-1" } }])
-    expect(readOutput(result)).toContain("task-1")
   })
 
   it("executes real Chorus tools with project scope from shared state", async () => {
@@ -260,6 +260,16 @@ describe("Chorus lazy bridge tools", () => {
       name: "chorus_add_comment",
       args: { targetType: "task", targetUuid: "task-1", content: "" },
     })
+  })
+
+  it("tells agents to call chorus_tools before executing an unknown tool", async () => {
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+    })
+
+    await expect(tools.chorus_tool_execute!.execute({ toolName: "missing_tool", arguments: {} }, createToolContext())).rejects.toThrow(
+      'Tool "missing_tool" not found. Call `chorus_tools` first to list available tools.',
+    )
   })
 })
 

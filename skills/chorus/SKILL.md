@@ -253,10 +253,11 @@ Preferred: configure the `opencode-chorus` plugin with `chorus.json` in the Open
 
 In OpenCode, use the bridge tools for Chorus access:
 
-1. `chorus_tool_explore` — search or inspect real Chorus tools such as `chorus_checkin`, `chorus_get_task`, or `chorus_update_task`.
-2. `chorus_tool_execute` — execute the real Chorus tool by name with its arguments.
+1. `chorus_tools` — list all available Chorus tool names.
+2. `chorus_tool_get` — inspect a tool by its name from `chorus_tools`.
+3. `chorus_tool_execute` — execute the Chorus tool by name with its arguments.
 
-Examples in these skills still name real Chorus tools directly for clarity. In OpenCode lazy-bridge mode, execute those real tools through `chorus_tool_execute`.
+Follow this order in OpenCode plugin: `chorus_tools` → `chorus_tool_get({ toolName: "..." })` → `chorus_tool_execute({ toolName: "...", arguments: { ... } })`.
 
 Manual fallback for non-plugin setups: add a remote MCP server to `opencode.json` or `opencode.jsonc`:
 
@@ -281,7 +282,7 @@ Restart OpenCode after changing `opencode.json`, `chorus.json`, or related envir
 ### 3. Verify Connection
 
 ```
-chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
+chorus_tool_execute({ toolName: "checkin", arguments: {} })
 ```
 
 If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode restarted?

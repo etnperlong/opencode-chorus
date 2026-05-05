@@ -21,7 +21,7 @@ The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for 
 | Feature Category | Components | Description |
 |---|---|---|
 | **Lifecycle Hooks** | State Management | Keeps your OpenCode session state in sync with the `.chorus` directory. |
-| | Lazy MCP Bridge | Exposes `chorus_tool_explore` and `chorus_tool_execute`, then discovers real Chorus tools from the Chorus MCP server on demand. |
+| | Lazy MCP Bridge | Exposes `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`, then discovers real Chorus tools from the Chorus MCP server on demand. |
 | **Review Agents** | Proposal Reviewer | Automated review agent that evaluates proposals and waits for verdicts. |
 | | Task Reviewer | Automated review agent that verifies completed tasks. |
 | **Workflow Skills** | `chorus` | The entry point. Platform overview, shared tools, and lifecycle rules. |
@@ -94,12 +94,13 @@ These settings only control visibility and hints. They do not auto-claim tasks, 
 
 ### Lazy Chorus Tools
 
-The plugin no longer injects a remote `mcp.chorus` server into OpenCode by default. Instead, it exposes two native bridge tools:
+The plugin no longer injects a remote `mcp.chorus` server into OpenCode by default. Instead, it exposes three native bridge tools:
 
-- `chorus_tool_explore` searches or inspects real Chorus tools from the remote Chorus MCP server.
-- `chorus_tool_execute` executes a real Chorus tool by name (or its short alias) after applying the plugin's argument-safety policy.
+- `chorus_tools` lists all Chorus tool names exposed by the remote Chorus MCP server.
+- `chorus_tool_get` returns the description for one Chorus tool.
+- `chorus_tool_execute` executes a real Chorus tool by name after applying the plugin's argument-safety policy.
 
-For example, to update a task status, first explore `chorus_update_task`, then execute it through the bridge. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
+For example, to update a task status, first call `chorus_tools`, then inspect `chorus_update_task` with `chorus_tool_get`, then execute it through the bridge. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
 
 ### 3. Restart OpenCode
 

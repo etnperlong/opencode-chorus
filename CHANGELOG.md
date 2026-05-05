@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Replaced the lazy bridge discovery flow with `chorus_tools` and `chorus_tool_get`, removing the unstable natural-language `chorus_tool_explore` path.
+- Updated the lazy bridge to expose and require raw Chorus MCP tool names such as `chorus_get_task` instead of trimmed public aliases.
+- Refreshed the README and bundled Chorus skills to teach the new `chorus_tools` → `chorus_tool_get` → `chorus_tool_execute` workflow.
+
 ## v0.3.1 - 2026-05-02
 
 ### Changed

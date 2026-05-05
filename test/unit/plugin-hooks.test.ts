@@ -828,7 +828,7 @@ describe("plugin hooks", () => {
       expect(plugin.config).toBeFunction()
       expect(plugin.event).toBeFunction()
       expect(plugin["tool.execute.after"]).toBeFunction()
-      expect(Object.keys(plugin.tool ?? {}).sort()).toEqual(["chorus_tool_execute", "chorus_tool_explore"])
+      expect(Object.keys(plugin.tool ?? {}).sort()).toEqual(["chorus_tool_execute", "chorus_tool_get", "chorus_tools"])
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

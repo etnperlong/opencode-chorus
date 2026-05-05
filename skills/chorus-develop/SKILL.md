@@ -23,7 +23,7 @@ This skill covers the **Development** stage of the AI-DLC workflow: claiming Tas
 
 ## OpenCode Tool Access
 
-In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tool_explore` and `chorus_tool_execute`. Tool examples below name the real Chorus operations for clarity; execute them through `chorus_tool_execute` with `toolName` set to the named operation and `arguments` set to the shown payload.
+In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`. Start with `chorus_tools`, inspect one tool with `chorus_tool_get({ toolName: "..." })`, then execute it with `chorus_tool_execute({ toolName: "...", arguments: { ... } })`.
 
 ---
 
@@ -356,7 +356,7 @@ task({
 
 ### MCP Access for Sub-Agents
 
-Sub-agents need access to the lazy Chorus bridge configured by the opencode-chorus plugin. If tools are missing, confirm `chorusUrl` and `apiKey` are configured for the OpenCode session, then use `chorus_tool_explore` to inspect real Chorus tools before executing them through `chorus_tool_execute`.
+Sub-agents need access to the lazy Chorus bridge configured by the opencode-chorus plugin. If tools are missing, confirm `chorusUrl` and `apiKey` are configured for the OpenCode session, then call `chorus_tools`, inspect the needed tool with `chorus_tool_get`, and execute it through `chorus_tool_execute`.
 
 ### Troubleshooting
 

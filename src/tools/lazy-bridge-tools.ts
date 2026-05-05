@@ -20,7 +20,7 @@ type CreateChorusLazyBridgeToolsOptions = {
 }
 
 type ToolSearchResult = {
-  toolName: string
+  name: string
   description: string
 }
 
@@ -70,42 +70,43 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
   }
 
   const tools = {
-    chorus_tool_explore: tool({
-      description: "Explore available Chorus tools by name or natural-language query before executing them.",
+    chorus_tools: tool({
+      description: "List all available Chorus tools before inspecting or executing one.",
+      args: {},
+      async execute() {
+        const index = await readToolIndex()
+        return formatToolResult(listTools(index))
+      },
+    }),
+
+    chorus_tool_get: tool({
+      description: "Get the description for one Chorus tool after listing names with chorus_tools.",
       args: {
-        query: tool.schema.string().optional().describe("Search terms for the Chorus tool you need"),
-        toolName: tool.schema.string().optional().describe("Exact Chorus tool name to inspect"),
-        limit: tool.schema.number().optional().default(5).describe("Maximum search results to return"),
-        includeSchema: tool.schema.boolean().optional().default(false).describe("Include full input schema"),
+        toolName: tool.schema.string().describe("Exact Chorus tool name from chorus_tools, for example: `chorus_get_task`"),
       },
       async execute(args) {
         const index = await readToolIndex()
-        const requestedToolName = args.toolName ? resolveRealChorusToolName(index, args.toolName) : undefined
-        const results = exploreTools(index, {
-          query: args.query,
-          toolName: requestedToolName,
-          limit: args.limit,
-          includeSchema: args.includeSchema,
-        })
-        return formatToolResult(results)
+        const target = index.find((item) => item.name === args.toolName)
+        if (!target) throw createToolNotFoundError(args.toolName)
+        return formatToolResult(describeTool(target))
       },
     }),
 
     chorus_tool_execute: tool({
-      description: "Execute a real Chorus MCP tool by name after inspecting it with chorus_tool_explore.",
+      description: "Execute a Chorus tool by name after listing tools with chorus_tools and inspecting one with chorus_tool_get.",
       args: {
-        toolName: tool.schema.string().describe("Real Chorus MCP tool name, for example chorus_get_task"),
+        toolName: tool.schema.string().describe("Chorus tool name, for example: `chorus_get_task`"),
         arguments: tool.schema
           .record(tool.schema.string(), tool.schema.unknown())
           .optional()
-          .describe("Arguments for the real Chorus tool"),
+          .describe("Arguments for the Chorus tool"),
         argumentPolicy: tool.schema.string().optional().default("default"),
       },
       async execute(args) {
         const index = await readToolIndex()
-        const toolName = resolveRealChorusToolName(index, args.toolName)
+        const toolName = args.toolName
         const target = index.find((item) => item.name === toolName)
-        if (!target) throw new Error(`Unknown Chorus tool: ${args.toolName}. Use chorus_tool_explore first.`)
+        if (!target) throw createToolNotFoundError(args.toolName)
 
         const policy = args.argumentPolicy === "raw" || args.argumentPolicy === "strict" ? args.argumentPolicy : "default"
         const normalizedArgs =
@@ -152,45 +153,26 @@ async function recordLazyBridgeStatus(
   }))
 }
 
-function exploreTools(
-  index: ChorusMcpToolDefinition[],
-  options: { query?: string; toolName?: string; limit?: number; includeSchema?: boolean },
-) {
-  if (options.toolName) {
-    const found = index.find((item) => item.name === options.toolName)
-    return {
-      tool: found ? describeTool(found, Boolean(options.includeSchema)) : null,
-    }
-  }
-
-  const query = options.query?.toLowerCase().trim()
-  const queryTokens = query?.split(/\s+/).filter(Boolean) ?? []
-  const candidates = query
-    ? index.filter((item) => {
-        const haystack = `${item.name} ${item.description ?? ""}`.toLowerCase()
-        return queryTokens.every((token) => haystack.includes(token))
-      })
-    : index
-
+function listTools(index: ChorusMcpToolDefinition[]) {
   return {
-    results: candidates.slice(0, options.limit ?? 5).map((item): ToolSearchResult => ({
-      toolName: toPublicChorusToolName(item.name),
+    total: index.length,
+    tools: index.map((item): ToolSearchResult => ({
+      name: item.name,
       description: item.description ?? "",
     })),
   }
 }
 
-function describeTool(toolDefinition: ChorusMcpToolDefinition, includeSchema: boolean) {
+function describeTool(toolDefinition: ChorusMcpToolDefinition) {
   const requiredFields = Array.isArray(toolDefinition.inputSchema.required)
     ? toolDefinition.inputSchema.required.filter((item): item is string => typeof item === "string")
     : []
   const properties = isRecord(toolDefinition.inputSchema.properties) ? Object.keys(toolDefinition.inputSchema.properties) : []
   return {
-    toolName: toPublicChorusToolName(toolDefinition.name),
+    toolName: toolDefinition.name,
     description: toolDefinition.description ?? "",
     requiredFields,
     optionalFields: properties.filter((property) => !requiredFields.includes(property)),
-    ...(includeSchema ? { inputSchema: toolDefinition.inputSchema } : {}),
   }
 }
 
@@ -217,14 +199,8 @@ export function normalizeToolArguments(
   return normalized
 }
 
-function resolveRealChorusToolName(index: ChorusMcpToolDefinition[], toolName: string): string {
-  if (index.some((item) => item.name === toolName)) return toolName
-  const prefixed = `chorus_${toolName}`
-  return index.some((item) => item.name === prefixed) ? prefixed : toolName
-}
-
-function toPublicChorusToolName(toolName: string): string {
-  return toolName.startsWith("chorus_") ? toolName.slice("chorus_".length) : toolName
+function createToolNotFoundError(toolName: string): Error {
+  return new Error(`Tool "${toolName}" not found. Call \`chorus_tools\` first to list available tools.`)
 }
 
 function formatToolResult(value: unknown, metadata?: Record<string, unknown>): ToolResult {
