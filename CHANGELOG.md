@@ -4,11 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.3.2 - 2026-05-05
+
 ### Changed
 
 - Replaced the lazy bridge discovery flow with `chorus_tools` and `chorus_tool_get`, removing the unstable natural-language `chorus_tool_explore` path.
 - Updated the lazy bridge to expose and require raw Chorus MCP tool names such as `chorus_get_task` instead of trimmed public aliases.
 - Refreshed the README and bundled Chorus skills to teach the new `chorus_tools` → `chorus_tool_get` → `chorus_tool_execute` workflow.
+
+### Fixed
+
+- Fixed reviewer gate timeout handling so active reviewer child sessions are checked through OpenCode `session.status` before being treated as timed out.
+- Fixed live reviewer gate result propagation for long-running task reviews by extending the wait window once and surfacing a `running` state when the reviewer is still busy.
+- Added stronger regression coverage for delayed reviewer completion and reviewer-session status lookup failures.
 
 ## v0.3.1 - 2026-05-02
 

@@ -5,6 +5,8 @@ import type { ReviewRecord } from "../state/state-types"
 import { parseVerdict, type ReviewVerdict } from "./review-parser"
 import { persistReviewTimeout, persistReviewVerdict } from "./review-sync"
 
+const MIN_REVIEWER_STATUS_TIMEOUT_MS = 500
+
 export type ReviewerWaitResult =
   | { status: "completed"; verdict: ReviewVerdict; comment?: string }
   | { status: "running"; message: string }
@@ -14,10 +16,16 @@ export type ReviewerWaitResult =
 
 type ReviewerWaitOptions = {
   client: Pick<ChorusMcpClient, "callTool">
+  reviewClient?: {
+    session?: {
+      status?: (args: Record<string, unknown>) => Promise<unknown>
+    }
+  }
   stateStore: StateStore
   targetKey: string
   targetType: "proposal" | "task"
   targetUuid: string
+  directory?: string
   timeoutMs: number
   pollIntervalMs: number
   reviewJobId?: string
@@ -25,7 +33,8 @@ type ReviewerWaitOptions = {
 }
 
 export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Promise<ReviewerWaitResult> {
-  const deadline = Date.now() + options.timeoutMs
+  let deadline = Date.now() + options.timeoutMs
+  let extendedForActiveReviewer = false
 
   while (true) {
     const state = await options.stateStore.readOpenCodeState()
@@ -33,13 +42,28 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
     if (persistedVerdict) return { status: "completed", ...persistedVerdict }
 
     const remainingMs = deadline - Date.now()
-    if (remainingMs <= 0) return timeoutResult(options)
+    if (remainingMs <= 0) {
+      const reviewerStatus = await readReviewerSessionStatus(options)
+      if (isReviewerSessionActive(reviewerStatus)) {
+        if (!extendedForActiveReviewer) {
+          extendedForActiveReviewer = true
+          deadline = Date.now() + options.timeoutMs
+          continue
+        }
+        return {
+          status: "running",
+          message: `Reviewer session ${options.reviewJobId ?? "unavailable"} is still ${formatReviewerSessionState(reviewerStatus)} after the wait window.`,
+        }
+      }
+
+      return timeoutResult(options)
+    }
 
     const result = await callToolWithTimeout(options.client, remainingMs, "chorus_get_comments", {
       targetType: options.targetType,
       targetUuid: options.targetUuid,
     }, options.scope)
-    if (result.status === "timeout") return timeoutResult(options)
+    if (result.status === "timeout") continue
 
     for (const content of extractCommentContents(result.value)) {
       if (options.reviewJobId && !hasReviewJobMarker(content, options.reviewJobId)) continue
@@ -59,7 +83,7 @@ export async function waitForReviewerVerdict(options: ReviewerWaitOptions): Prom
       return { status: "completed", verdict, comment: content }
     }
 
-    if (Date.now() >= deadline) return timeoutResult(options)
+    if (Date.now() >= deadline) continue
     await sleep(Math.min(Math.max(options.pollIntervalMs, 0), Math.max(deadline - Date.now(), 0)))
   }
 }
@@ -71,6 +95,54 @@ async function timeoutResult(options: ReviewerWaitOptions): Promise<ReviewerWait
     options.reviewJobId ? { expectedReviewJobId: options.reviewJobId } : {},
   )
   return { status: "timeout" }
+}
+
+async function readReviewerSessionStatus(
+  options: ReviewerWaitOptions,
+): Promise<"busy" | "retry" | "idle" | "unknown"> {
+  if (!options.reviewJobId || !options.directory || !options.reviewClient?.session?.status) return "unknown"
+
+  try {
+    const result = await callPromiseWithTimeout(
+      options.reviewClient.session.status({
+        query: { directory: options.directory },
+        responseStyle: "data",
+        throwOnError: true,
+      }),
+      Math.max(options.pollIntervalMs, MIN_REVIEWER_STATUS_TIMEOUT_MS),
+    )
+    if (result.status === "timeout") return "unknown"
+
+    const sessionStatuses = extractSessionStatuses(result.value)
+    const sessionStatus = sessionStatuses[options.reviewJobId]
+    if (!isRecord(sessionStatus)) return "unknown"
+
+    const type = sessionStatus.type
+    if (type === "busy" || type === "retry" || type === "idle") return type
+    return "unknown"
+  } catch {
+    return "unknown"
+  }
+}
+
+function extractSessionStatuses(response: unknown): Record<string, unknown> {
+  if (isRecord(response)) {
+    const data = response.data
+    if (isRecord(data)) return data
+    return response
+  }
+
+  return {}
+}
+
+function isReviewerSessionActive(status: "busy" | "retry" | "idle" | "unknown"): boolean {
+  return status === "busy" || status === "retry"
+}
+
+function formatReviewerSessionState(status: "busy" | "retry" | "idle" | "unknown"): string {
+  if (status === "retry") return "retrying"
+  if (status === "busy") return "running"
+  return "active"
 }
 
 function hasReviewJobMarker(content: string, reviewJobId: string): boolean {
@@ -104,6 +176,24 @@ async function callToolWithTimeout(
   try {
     return await Promise.race([
       call.then((value) => ({ status: "completed", value }) as const),
+      timeout,
+    ])
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
+  }
+}
+
+async function callPromiseWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<{ status: "completed"; value: T } | { status: "timeout" }> {
+  void promise.catch(() => {})
+
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<{ status: "timeout" }>((resolve) => {
+    timeoutId = setTimeout(() => resolve({ status: "timeout" }), timeoutMs)
+  })
+
+  try {
+    return await Promise.race([
+      promise.then((value) => ({ status: "completed", value }) as const),
       timeout,
     ])
   } finally {

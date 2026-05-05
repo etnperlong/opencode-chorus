@@ -86,6 +86,58 @@ describe("waitForReviewerVerdict", () => {
     })
   })
 
+  it("returns running instead of timing out while the reviewer session is still busy", async () => {
+    const store = await createStore()
+    await persistReview(store, "task:task-still-busy", undefined, "reviewing", "review-still-busy")
+    const client = new FakeMcpClient([{ comments: [] }, { comments: [] }, { comments: [] }])
+    const reviewClient = new FakeReviewClient("review-still-busy", ["busy", "busy"])
+
+    const result = await waitForReviewerVerdict({
+      client,
+      reviewClient,
+      directory: "/tmp/project",
+      stateStore: store,
+      targetKey: "task:task-still-busy",
+      targetType: "task",
+      targetUuid: "task-still-busy",
+      timeoutMs: 1,
+      pollIntervalMs: 1,
+      reviewJobId: "review-still-busy",
+    })
+    const state = await store.readOpenCodeState()
+
+    expect(result).toEqual({
+      status: "running",
+      message: "Reviewer session review-still-busy is still running after the wait window.",
+    })
+    expect(state.reviews["task:task-still-busy"]).toMatchObject({
+      status: "reviewing",
+      lastReviewJobId: "review-still-busy",
+    })
+  })
+
+  it("falls back safely when reviewer session status lookup fails", async () => {
+    const store = await createStore()
+    await persistReview(store, "task:task-status-error", undefined, "reviewing", "review-status-error")
+    const client = new FakeMcpClient([{ comments: [] }])
+    const reviewClient = new RejectingReviewClient()
+
+    const result = await waitForReviewerVerdict({
+      client,
+      reviewClient,
+      directory: "/tmp/project",
+      stateStore: store,
+      targetKey: "task:task-status-error",
+      targetType: "task",
+      targetUuid: "task-status-error",
+      timeoutMs: 1,
+      pollIntervalMs: 1,
+      reviewJobId: "review-status-error",
+    })
+
+    expect(result).toEqual({ status: "timeout" })
+  })
+
   it("returns and persists a verdict found in Chorus comments", async () => {
     const store = await createStore()
     const client = new FakeMcpClient([{ comments: [{ content: "Looks good\nVERDICT: PASS WITH NOTES" }] }])
@@ -304,6 +356,33 @@ class FakeMcpClient {
 class HangingMcpClient {
   async callTool<T>(): Promise<T> {
     return new Promise<T>(() => {})
+  }
+}
+
+class FakeReviewClient {
+  readonly calls: Array<Record<string, unknown>> = []
+  private nextStatus = 0
+
+  constructor(
+    private readonly reviewJobId: string,
+    private readonly statuses: Array<"busy" | "retry" | "idle">,
+  ) {}
+
+  readonly session = {
+    status: async (args: Record<string, unknown>) => {
+      this.calls.push(args)
+      const status = this.statuses[Math.min(this.nextStatus, this.statuses.length - 1)] ?? "idle"
+      this.nextStatus += 1
+      return { data: { [this.reviewJobId]: { type: status } } }
+    },
+  }
+}
+
+class RejectingReviewClient {
+  readonly session = {
+    status: async () => {
+      throw new Error("status unavailable")
+    },
   }
 }
 

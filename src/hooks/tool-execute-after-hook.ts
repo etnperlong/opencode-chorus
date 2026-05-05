@@ -185,9 +185,11 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
       const waitResult = await waitForReviewerVerdict({
         stateStore: options.stateStore,
         client: options.chorusClient,
+        reviewClient: options.context.client,
         targetType: "proposal",
         targetUuid: proposalUuid,
         targetKey,
+        directory: options.context.directory,
         timeoutMs: options.config.reviewerWaitTimeoutMs,
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
@@ -292,9 +294,11 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
       const waitResult = await waitForReviewerVerdict({
         stateStore: options.stateStore,
         client: options.chorusClient,
+        reviewClient: options.context.client,
         targetType: "task",
         targetUuid: taskUuid,
         targetKey,
+        directory: options.context.directory,
         timeoutMs: options.config.reviewerWaitTimeoutMs,
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,

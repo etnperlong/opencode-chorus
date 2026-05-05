@@ -8,6 +8,7 @@ const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
 const toastCalls: Array<{ title?: string; message?: string; variant?: string }> = []
 let getCommentsResponse: unknown = { comments: [] }
+let sessionStatusResponse: Record<string, unknown> = {}
 const chorusSkillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 let configDir = ""
 let previousConfigDir: string | undefined
@@ -71,6 +72,7 @@ describe("plugin hooks", () => {
     logCalls.length = 0
     toastCalls.length = 0
     getCommentsResponse = { comments: [] }
+    sessionStatusResponse = {}
     listToolsCalls = 0
     listToolsError = undefined
     if (previousConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
@@ -356,6 +358,130 @@ describe("plugin hooks", () => {
         reviewNextAction: "Inspect reviewer session review-session-1 or task comments, then retry the reviewer gate or escalate.",
       })
       expect(output.output).toContain("Reviewer did not finish before timeout")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("keeps reviewer gates in running state when the child reviewer session is still busy", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 1,
+        reviewerPollIntervalMs: 1,
+      })
+      getCommentsResponse = { comments: [] }
+      sessionStatusResponse = { "review-session-1": { type: "busy" } }
+      const output: { title: string; output: string; metadata: unknown } = {
+        title: "",
+        output: JSON.stringify({ submitted: true }),
+        metadata: { preserved: true },
+      }
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_submit_for_verify",
+          args: { taskUuid: "task-still-running" },
+          sessionID: "session-1",
+        } as never,
+        output as never,
+      )
+
+      expect(output.metadata).toEqual({
+        preserved: true,
+        sessionId: "review-session-1",
+        taskId: "review-session-1",
+        agent: "task-reviewer",
+        reviewStatus: "running",
+        reviewJobId: "review-session-1",
+        reviewRound: 1,
+        reviewMaxRounds: 3,
+        reviewGateOutputMode: "summary",
+        reviewNextAction: "Wait for reviewer session review-session-1 to finish before retrying this gate.",
+      })
+      expect(output.output).toContain("still running after the wait window")
+
+      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
+      expect(state.reviews["task:task-still-running"]).toMatchObject({
+        status: "reviewing",
+        lastReviewJobId: "review-session-1",
+      })
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("completes the gate when a busy reviewer posts its verdict during the extended wait window", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 20,
+        reviewerPollIntervalMs: 1,
+      })
+      getCommentsResponse = { comments: [] }
+      sessionStatusResponse = { "review-session-1": { type: "busy" } }
+      const output: { title: string; output: string; metadata: unknown } = {
+        title: "",
+        output: JSON.stringify({ submitted: true }),
+        metadata: { preserved: true },
+      }
+
+      const timer = setTimeout(() => {
+        getCommentsResponse = {
+          comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }],
+        }
+      }, 25)
+
+      try {
+        await plugin["tool.execute.after"]?.(
+          {
+            tool: "chorus_submit_for_verify",
+            args: { taskUuid: "task-delayed-reviewer" },
+            sessionID: "session-1",
+          } as never,
+          output as never,
+        )
+      } finally {
+        clearTimeout(timer)
+      }
+
+      expect(output.metadata).toEqual({
+        preserved: true,
+        sessionId: "review-session-1",
+        taskId: "review-session-1",
+        agent: "task-reviewer",
+        reviewStatus: "completed",
+        verdict: "PASS",
+        reviewJobId: "review-session-1",
+        reviewRound: 1,
+        reviewMaxRounds: 3,
+        reviewGateOutputMode: "summary",
+        reviewNextAction: "Proceed to admin verification.",
+      })
+      expect(output.output).toContain('"verdict": "PASS"')
+      expect(sessionCalls).toContainEqual({
+        name: "status",
+        args: expect.objectContaining({
+          query: { directory: rootDir },
+          responseStyle: "data",
+          throwOnError: true,
+        }),
+      })
+
+      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
+      expect(state.reviews["task:task-delayed-reviewer"]).toMatchObject({
+        status: "approved",
+        lastVerdict: "PASS",
+        lastReviewJobId: "review-session-1",
+      })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -1010,6 +1136,10 @@ function createContext(directory: string) {
         },
         promptAsync: async (args: Record<string, unknown>) => {
           sessionCalls.push({ name: "promptAsync", args })
+        },
+        status: async (args: Record<string, unknown>) => {
+          sessionCalls.push({ name: "status", args })
+          return { data: sessionStatusResponse }
         },
       },
     },
