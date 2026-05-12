@@ -100,7 +100,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
           .record(tool.schema.string(), tool.schema.unknown())
           .optional()
           .describe("Arguments for the Chorus tool"),
-        argumentPolicy: tool.schema.string().optional().default("default"),
       },
       async execute(args) {
         const index = await readToolIndex()
@@ -108,16 +107,11 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
         const target = index.find((item) => item.name === toolName)
         if (!target) throw createToolNotFoundError(args.toolName)
 
-        const policy = args.argumentPolicy === "raw" || args.argumentPolicy === "strict" ? args.argumentPolicy : "default"
-        const normalizedArgs =
-          policy === "raw"
-            ? (args.arguments ?? {})
-            : normalizeToolArguments(toolName, args.arguments ?? {}, target.inputSchema)
+        const normalizedArgs = normalizeToolArguments(toolName, args.arguments ?? {}, target.inputSchema)
         const scope = await resolveChorusToolScope(options.stateStore)
         const result = await options.chorusClient.callTool(toolName, normalizedArgs, scope)
         return formatToolResult(result, {
           chorusToolName: toolName,
-          argumentPolicy: policy,
         })
       },
     }),
