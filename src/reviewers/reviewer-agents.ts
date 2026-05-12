@@ -37,7 +37,12 @@ export async function applyReviewerAgentConfig(config: Config): Promise<void> {
       permission: {
         ...config.agent?.[TASK_REVIEWER_AGENT]?.permission,
         edit: "deny",
-        bash: "ask",
+        // Task reviewers may need read-only verification commands while the parent
+        // submit-for-verify hook is synchronously waiting for their verdict. Using
+        // "ask" here can deadlock the parent session if the child pauses on a
+        // permission prompt, so allow bash and rely on the reviewer prompt's
+        // read-only constraints instead.
+        bash: "allow",
       },
     },
   }

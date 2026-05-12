@@ -822,11 +822,19 @@ describe("plugin hooks", () => {
       expect(proposalReviewer).toMatchObject({
         mode: "subagent",
         maxSteps: 20,
+        permission: {
+          edit: "deny",
+          bash: "deny",
+        },
       })
       expect(proposalReviewer?.prompt).toContain("Hard stop rule")
       expect(taskReviewer).toMatchObject({
         mode: "subagent",
         maxSteps: 25,
+        permission: {
+          edit: "deny",
+          bash: "allow",
+        },
       })
       expect(taskReviewer?.prompt).toContain("targeted re-verification")
     } finally {
