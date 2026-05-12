@@ -10,6 +10,7 @@ describe("plugin event hook", () => {
     const heartbeatCalls: string[] = []
     const stopCalls: string[] = []
     const startCalls: Array<{ sessionId: string; replaceExisting: boolean }> = []
+    const idleCallbacks: string[] = []
 
     const hook = createPluginEventHook({
       autoStart: true,
@@ -29,11 +30,15 @@ describe("plugin event hook", () => {
         },
       } as never,
       logger: { debug: async () => {}, info: async () => {}, warn: async () => {} },
+      onSessionIdle: async (sessionId: string) => {
+        idleCallbacks.push(sessionId)
+      },
     })
 
     await hook({ event: { type: "session.idle", properties: { info: { id: "runtime-1" } } } })
 
     expect(heartbeatCalls).toEqual(["runtime-1"])
+    expect(idleCallbacks).toEqual(["runtime-1"])
     expect(stopCalls).toEqual([])
     expect(startCalls).toEqual([])
   })
@@ -81,6 +86,7 @@ describe("plugin event hook", () => {
     const store = await createStore()
     const startCalls: Array<{ sessionId: string; replaceExisting: boolean }> = []
     const surfacedSessions: string[] = []
+    const readySessions: string[] = []
 
     const hook = createPluginEventHook({
       autoStart: true,
@@ -97,6 +103,9 @@ describe("plugin event hook", () => {
         stop: async () => {},
       } as never,
       logger: { debug: async () => {}, info: async () => {}, warn: async () => {} },
+      onSessionReady: async (sessionId: string) => {
+        readySessions.push(sessionId)
+      },
     })
 
     await hook({ event: { type: "session.updated", properties: { info: { id: "runtime-updated" } } } })
@@ -104,6 +113,7 @@ describe("plugin event hook", () => {
 
     expect(startCalls).toEqual([{ sessionId: "runtime-updated", replaceExisting: false }])
     expect(surfacedSessions).toEqual(["runtime-updated"])
+    expect(readySessions).toEqual(["runtime-updated"])
   })
 })
 

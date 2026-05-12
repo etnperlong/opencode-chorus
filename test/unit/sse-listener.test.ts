@@ -38,19 +38,73 @@ describe("ChorusSseListener", () => {
     globalThis.fetch = originalFetch
   })
 
-  it("throws when the SSE endpoint responds with an error", async () => {
-    globalThis.fetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch
+  it("reconnects after a non-ok SSE response", async () => {
+    const encoder = new TextEncoder()
+    let fetchCalls = 0
+    const statuses: string[] = []
 
-    const listener = new ChorusSseListener("http://chorus.test", "key", () => {})
+    globalThis.fetch = (async () => {
+      fetchCalls += 1
+      if (fetchCalls === 1) return new Response("nope", { status: 503 })
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(': heartbeat\n\n'))
+            setTimeout(() => controller.close(), 10)
+          },
+        }),
+        { status: 200 },
+      )
+    }) as unknown as typeof fetch
 
-    await expect(listener.connect()).rejects.toThrow("503")
+    const listener = new ChorusSseListener("http://chorus.test", "key", () => {}, {
+      initialReconnectDelayMs: 1,
+      maxReconnectDelayMs: 1,
+      onStatusChange: (status) => {
+        statuses.push(status)
+      },
+    })
+
+    const connectPromise = listener.connect()
+    await Bun.sleep(20)
+    listener.disconnect()
+    await connectPromise
+
+    expect(fetchCalls).toBeGreaterThanOrEqual(2)
+    expect(statuses).toContain("reconnecting")
+    expect(statuses).toContain("connected")
   })
 
-  it("throws when the SSE endpoint has no response body", async () => {
-    globalThis.fetch = (async () => ({ ok: true, status: 204, body: null }) as Response) as unknown as typeof fetch
+  it("calls onReconnect after the stream reconnects", async () => {
+    let reconnectCalls = 0
+    let fetchCalls = 0
 
-    const listener = new ChorusSseListener("http://chorus.test", "key", () => {})
+    globalThis.fetch = (async () => {
+      fetchCalls += 1
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.close()
+          },
+        }),
+        { status: 200 },
+      )
+    }) as unknown as typeof fetch
 
-    await expect(listener.connect()).rejects.toThrow("body")
+    const listener = new ChorusSseListener("http://chorus.test", "key", () => {}, {
+      initialReconnectDelayMs: 1,
+      maxReconnectDelayMs: 1,
+      onReconnect: async () => {
+        reconnectCalls += 1
+      },
+    })
+
+    const connectPromise = listener.connect()
+    await Bun.sleep(20)
+    listener.disconnect()
+    await connectPromise
+
+    expect(fetchCalls).toBeGreaterThanOrEqual(2)
+    expect(reconnectCalls).toBeGreaterThanOrEqual(1)
   })
 })

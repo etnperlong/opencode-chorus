@@ -7,13 +7,9 @@ import { createPluginEventHook } from "./hooks/plugin-event-hook"
 import { createToolExecuteAfterHook } from "./hooks/tool-execute-after-hook"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { SessionLifecycle } from "./lifecycle/session-lifecycle"
-import { enqueueRoutedNotification } from "./notifications/notification-dispatcher"
-import { fetchUnreadNotificationByUuid } from "./notifications/notification-pagination"
-import { routeNotification } from "./notifications/notification-router"
-import { ChorusSseListener, type SseNotificationEvent } from "./notifications/sse-listener"
+import { NotificationCoordinator } from "./notifications/notification-coordinator"
 import { StateStore } from "./state/state-store"
 import { createChorusLazyBridge } from "./tools/lazy-bridge-tools"
-import { formatError } from "./util/error-utils"
 import { createLogger } from "./util/logger"
 
 export const createPlugin: Plugin = async (ctx, options) => {
@@ -50,6 +46,17 @@ export const createPlugin: Plugin = async (ctx, options) => {
   })
   const sessionLifecycle = new SessionLifecycle(stateStore, chorusClient, config.chorusUrl)
   const planningLifecycle = new PlanningLifecycle(stateStore)
+  const notificationCoordinator = new NotificationCoordinator({
+    chorusUrl: config.chorusUrl,
+    apiKey: config.apiKey,
+    autoStart: config.autoStart,
+    enableNotificationHints: config.enableNotificationHints,
+    directory: ctx.directory,
+    stateStore,
+    chorusClient,
+    client: ctx.client,
+    logger,
+  })
   const eventHook = createPluginEventHook({
     autoStart: config.autoStart,
     enableSessionContextSummary: config.enableSessionContextSummary,
@@ -58,6 +65,12 @@ export const createPlugin: Plugin = async (ctx, options) => {
     logger,
     onSessionStartup: async () => {
       await lazyBridge.refresh()
+    },
+    onSessionReady: async (sessionId) => {
+      await notificationCoordinator.handleSessionReady(sessionId)
+    },
+    onSessionIdle: async (sessionId) => {
+      await notificationCoordinator.handleSessionIdle(sessionId)
     },
   })
   const toolExecuteAfterHook = createToolExecuteAfterHook({
@@ -70,12 +83,6 @@ export const createPlugin: Plugin = async (ctx, options) => {
     },
     chorusClient,
   })
-  const notificationListener = new ChorusSseListener(config.chorusUrl, config.apiKey, (event) => {
-    void handleNotificationEvent(event).catch((error) =>
-      logger.error("Failed to process Chorus notification event", { error: formatError(error) }),
-    )
-  })
-
   if (loadedConfig.metadata.apiKeySource === "chorus.json") {
     await logger.warn("Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.")
   }
@@ -84,27 +91,13 @@ export const createPlugin: Plugin = async (ctx, options) => {
     worktree: ctx.worktree,
     chorusUrl: config.chorusUrl,
   })
-  void notificationListener
-    .connect()
-    .catch((error) => logger.warn("Chorus notification listener stopped", { error: formatError(error) }))
+  await notificationCoordinator.start()
 
   return {
     config: applyPluginConfig,
     event: eventHook,
     "tool.execute.after": toolExecuteAfterHook,
     tool: lazyBridge.tools,
-  }
-
-  async function handleNotificationEvent(event: SseNotificationEvent): Promise<void> {
-    if (event.type !== "new_notification" || !event.notificationUuid) return
-
-    const notification = await fetchUnreadNotificationByUuid(chorusClient, event.notificationUuid)
-    if (!notification) return
-
-    const routed = routeNotification(notification, { enableNotificationHints: config.enableNotificationHints })
-    if (routed.kind === "ignored") return
-
-    await enqueueRoutedNotification(stateStore, routed)
   }
 }
 

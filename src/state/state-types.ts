@@ -79,12 +79,28 @@ export type SessionContextRecord = {
 
 export type QueuedNotification = {
   id: string
+  notificationUuid: string
   kind: string
+  delivery: "assistant_turn" | "context_only"
   entityUuid?: string
   projectUuid?: string
+  title: string
+  toastMessage: string
+  prompt: string
   actionHint?: string
   createdAt: string
+  updatedAt: string
+  attempts: number
   status: "pending" | "processing" | "done" | "failed"
+  lastError?: string
+}
+
+export type NotificationRuntimeRecord = {
+  status: "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error"
+  lastEventAt?: string
+  lastConnectedAt?: string
+  lastReconnectAt?: string
+  lastError?: string
 }
 
 export type OpenCodeState = {
@@ -102,6 +118,7 @@ export type OpenCodeState = {
   reviews: Record<string, ReviewRecord>
   sessionContext?: SessionContextRecord
   lazyBridge?: LazyBridgeStatusRecord
+  notificationRuntime?: NotificationRuntimeRecord
   notificationQueue: QueuedNotification[]
   checkpoints: {
     lastUnreadBackfillAt?: string

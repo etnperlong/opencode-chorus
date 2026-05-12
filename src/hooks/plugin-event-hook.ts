@@ -19,6 +19,8 @@ type CreatePluginEventHookOptions = {
   sessionLifecycle: SessionLifecycle
   logger: Pick<Logger, "debug" | "info" | "warn">
   onSessionStartup?: () => Promise<void>
+  onSessionReady?: (sessionId: string) => Promise<void>
+  onSessionIdle?: (sessionId: string) => Promise<void>
 }
 
 export function createPluginEventHook(options: CreatePluginEventHookOptions) {
@@ -54,13 +56,17 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
             })
           }
         }
+        await options.onSessionReady?.(sessionId)
         hasHandledSessionStartup = true
       }
     }
 
     if (event.type === "session.idle") {
       const sessionId = extractSessionEventId(event)
-      if (sessionId) await options.sessionLifecycle.heartbeat(sessionId)
+      if (sessionId) {
+        await options.sessionLifecycle.heartbeat(sessionId)
+        await options.onSessionIdle?.(sessionId)
+      }
     }
 
     if (event.type === "session.deleted") {
