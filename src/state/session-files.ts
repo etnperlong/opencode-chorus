@@ -1,4 +1,4 @@
-import { unlink, writeFile } from "node:fs/promises"
+import { mkdir, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { ChorusPaths } from "./paths"
 
@@ -29,6 +29,7 @@ export function buildSessionFile(input: SessionFileInput) {
 }
 
 export async function writeSessionFile(paths: ChorusPaths, name: string, input: SessionFileInput) {
+  await mkdir(paths.sessionsDir, { recursive: true })
   await writeFile(join(paths.sessionsDir, `${name}.json`), JSON.stringify(buildSessionFile(input), null, 2), "utf8")
 }
 

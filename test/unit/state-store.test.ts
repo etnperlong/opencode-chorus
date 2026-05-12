@@ -112,4 +112,21 @@ describe("StateStore", () => {
 
     expect(Object.keys(result.workers).sort()).toEqual(["first", "second"])
   })
+
+  it("creates state files lazily on first write without init", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "chorus-state-"))
+    const store = new StateStore(projectRoot, ".chorus")
+
+    await store.updateOpenCodeState((state) => ({
+      ...state,
+      mainSession: {
+        ...state.mainSession,
+        status: "active",
+      },
+    }))
+
+    const result = await store.readOpenCodeState()
+
+    expect(result.mainSession.status).toBe("active")
+  })
 })

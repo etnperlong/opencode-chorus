@@ -32,7 +32,6 @@ export const createPlugin: Plugin = async (ctx, options) => {
   const config = loadedConfig.config
   const applyPluginConfig = createPluginConfigApplier()
   const stateStore = new StateStore(ctx.directory, config.stateDir)
-  await stateStore.init()
   const chorusClient = new ChorusMcpClient({
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,

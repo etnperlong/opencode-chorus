@@ -13,11 +13,7 @@ export class StateStore {
   }
 
   async init(): Promise<void> {
-    await mkdir(this.paths.rootDir, { recursive: true })
-    await mkdir(this.paths.sessionsDir, { recursive: true })
-    await mkdir(this.paths.locksDir, { recursive: true })
-    await this.updateOpenCodeState((state) => state)
-    await this.updateSharedState((state) => state)
+    // No-op: state directories/files are created lazily on first write.
   }
 
   async readOpenCodeState(): Promise<OpenCodeState> {
@@ -69,6 +65,7 @@ export class StateStore {
   }
 
   private async atomicWrite(filePath: string, contents: string): Promise<void> {
+    await mkdir(this.paths.rootDir, { recursive: true })
     const tempPath = join(this.paths.rootDir, `.tmp-${Date.now()}-${Math.random().toString(16).slice(2)}.json`)
     await writeFile(tempPath, contents, "utf8")
     await rename(tempPath, filePath)

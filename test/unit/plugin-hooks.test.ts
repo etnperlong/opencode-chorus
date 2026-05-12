@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { StateStore } from "../../src/state/state-store"
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
@@ -95,6 +96,21 @@ describe("plugin hooks", () => {
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never)
 
       expect(toolCalls.map((call) => call.name)).not.toContain("chorus_checkin")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not create .chorus state on plugin creation alone", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await expect(access(join(rootDir, ".chorus"))).rejects.toMatchObject({ code: "ENOENT" })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -530,17 +546,21 @@ describe("plugin hooks", () => {
         enableTaskReviewer: true,
         maxTaskReviewRounds: 1,
       })
-      const statePath = join(rootDir, ".chorus", "opencode-state.json")
-      const state = JSON.parse(await readFile(statePath, "utf8"))
-      state.reviews["task:task-escalated"] = {
-        currentRound: 1,
-        maxRounds: 1,
-        status: "changes-requested",
-        lastVerdict: "FAIL",
-        lastReviewJobId: "review-session-previous",
-        blockersSnapshot: [],
-      }
-      await writeFile(statePath, JSON.stringify(state, null, 2))
+      const store = new StateStore(rootDir, ".chorus")
+      await store.updateOpenCodeState((state) => ({
+        ...state,
+        reviews: {
+          ...state.reviews,
+          "task:task-escalated": {
+            currentRound: 1,
+            maxRounds: 1,
+            status: "changes-requested",
+            lastVerdict: "FAIL",
+            lastReviewJobId: "review-session-previous",
+            blockersSnapshot: [],
+          },
+        },
+      }))
 
       const output: { title: string; output: string; metadata: unknown } = {
         title: "",
@@ -696,14 +716,19 @@ describe("plugin hooks", () => {
         apiKey: "test-key",
       })
       const statePath = join(rootDir, ".chorus", "opencode-state.json")
-      const state = JSON.parse(await readFile(statePath, "utf8"))
-      state.reviews["task:task-without-job"] = {
-        currentRound: 1,
-        maxRounds: 3,
-        status: "reviewing",
-        blockersSnapshot: [],
-      }
-      await writeFile(statePath, JSON.stringify(state, null, 2))
+      const store = new StateStore(rootDir, ".chorus")
+      await store.updateOpenCodeState((state) => ({
+        ...state,
+        reviews: {
+          ...state.reviews,
+          "task:task-without-job": {
+            currentRound: 1,
+            maxRounds: 3,
+            status: "reviewing",
+            blockersSnapshot: [],
+          },
+        },
+      }))
 
       await plugin["tool.execute.after"]?.(
         {
@@ -766,8 +791,7 @@ describe("plugin hooks", () => {
         { output: JSON.stringify({}) } as never,
       )
 
-      const state = JSON.parse(await readFile(join(rootDir, ".chorus", "opencode-state.json"), "utf8"))
-      expect(state.reviews["task:task-1"]?.lastVerdict).toBeUndefined()
+      await expect(access(join(rootDir, ".chorus", "opencode-state.json"))).rejects.toMatchObject({ code: "ENOENT" })
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
