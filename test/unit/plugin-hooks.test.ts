@@ -859,7 +859,9 @@ describe("plugin hooks", () => {
       expect(plugin.config).toBeFunction()
       expect(plugin.event).toBeUndefined()
       expect(plugin.tool).toBeUndefined()
+      expect(plugin["permission.ask"]).toBeUndefined()
       expect(plugin["tool.execute.after"]).toBeUndefined()
+      expect(plugin["experimental.chat.system.transform"]).toBeUndefined()
 
       await plugin.config?.(config as never)
 
@@ -992,8 +994,30 @@ describe("plugin hooks", () => {
 
       expect(plugin.config).toBeFunction()
       expect(plugin.event).toBeFunction()
+      expect(plugin["permission.ask"]).toBeFunction()
       expect(plugin["tool.execute.after"]).toBeFunction()
+      expect(plugin["experimental.chat.system.transform"]).toBeFunction()
       expect(Object.keys(plugin.tool ?? {}).sort()).toEqual(["chorus_tool_execute", "chorus_tool_get", "chorus_tools"])
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("injects system guidance to prefer native file tools and use the staging directory", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const output = { system: ["existing guidance"] }
+
+      await plugin["experimental.chat.system.transform"]?.({} as never, output as never)
+
+      expect(output.system).toContain("existing guidance")
+      expect(output.system.some((line) => line.includes("Prefer OpenCode's native `write` and `edit` tools"))).toBe(true)
+      expect(output.system.some((line) => line.includes("Chorus staging directory"))).toBe(true)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

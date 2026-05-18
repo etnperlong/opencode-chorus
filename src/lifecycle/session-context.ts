@@ -1,4 +1,5 @@
 import type { SessionContextRecord } from "../state/state-types"
+import { formatStagingDirGuidance } from "../util/staging-guidance"
 
 export function buildSessionContext(checkin: unknown, runtimeSessionId: string, now = new Date()): SessionContextRecord {
   const record = isRecord(checkin) ? checkin : {}
@@ -21,12 +22,7 @@ export function formatSessionContextSummary(context: SessionContextRecord, stagi
   const projectSummary = project ? formatProjectSummary(project) : "no tracked Chorus projects"
   const summary = `Chorus context: ${agentName} connected; ${formatCount(notificationCount, "unread notification")}; ${projectSummary}.`
   if (!stagingDir) return summary
-  return (
-    summary +
-    `\n\nChorus document staging directory: ${stagingDir}\n` +
-    `Write Chorus document bodies to files in this directory and pass the absolute path via \`contentPath\`. ` +
-    `This directory is outside the workspace to keep project files clean. Files here are deleted when the session ends.`
-  )
+  return `${summary}\n\n${formatStagingDirGuidance(stagingDir)}`
 }
 
 function readAgent(value: unknown): SessionContextRecord["agent"] {

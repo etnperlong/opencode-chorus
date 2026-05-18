@@ -313,6 +313,8 @@ chorus_admin_delete_idea({ ideaUuid: "<idea-uuid>" })
 
 #### Document Management
 
+Use OpenCode's native `write` / `edit` tools when preparing updated document files for upload.
+
 ```
 chorus_admin_delete_document({ documentUuid: "<doc-uuid>" })
 # Write the updated content to the Chorus staging directory first, then:

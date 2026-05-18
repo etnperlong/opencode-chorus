@@ -262,6 +262,7 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    Convert `tasks.md` into task drafts using `chorus_pm_add_task_draft`, preserving dependencies.
 
 4. **Free-form mode: write the tech design to the Chorus staging directory and add it via `contentPath`:**
+   Use OpenCode's native `write` / `edit` tools for the staging file instead of bash-based file writes whenever possible.
    ```
    # Write the tech design content to a file in <chorus-staging-dir> first, then:
    chorus_pm_add_document_draft({

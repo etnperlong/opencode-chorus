@@ -279,7 +279,9 @@ describe("SessionLifecycle", () => {
       await lifecycle.surfaceContextSummary("s-staging", { info: async (m) => { messages.push(m) } }, "/chorus/staging")
 
       expect(messages[0]).toContain("Chorus document staging directory: /chorus/staging")
+      expect(messages[0]).toContain("Prefer OpenCode's native `write` and `edit` tools")
       expect(messages[0]).toContain("Files here are deleted when the session ends")
+      expect(messages[0]).toContain("auto-allows write/edit permission requests")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

@@ -128,7 +128,7 @@ For example, to update a task status, first call `chorus_tools`, then inspect `c
 
 The four managed document write tools — `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` — require a `contentPath` parameter instead of inline `content`.
 
-**For non-OpenSpec workflows**, write the document body to a file in the Chorus staging directory and pass its absolute path via `contentPath`. The plugin injects the staging directory path at session start (in the Chorus context summary). The bridge reads the file and injects its content into the remote Chorus call. Staging files are outside the workspace and are deleted automatically when the session ends.
+**For non-OpenSpec workflows**, write the document body to a file in the Chorus staging directory and pass its absolute path via `contentPath`. The plugin injects the staging directory path at session start (in the Chorus context summary). The bridge reads the file and injects its content into the remote Chorus call. Staging files are outside the workspace and are deleted automatically when the session ends. The plugin also auto-allows write/edit permission requests that target this staging directory, and its injected instructions tell agents to prefer OpenCode's native `write`/`edit` tools over bash-based file writes.
 
 **For OpenSpec workflows** (`chorus-openspec`), pass the local OpenSpec artifact path (e.g., `openspec/changes/<slug>/proposal.md`) directly.
 

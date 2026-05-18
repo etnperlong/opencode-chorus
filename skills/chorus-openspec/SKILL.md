@@ -76,7 +76,7 @@ When OpenSpec mode is active, create and maintain local OpenSpec artifacts first
 
 ## Mirror Sync To Chorus Drafts
 
-After local artifacts are written, mirror each file to the Chorus proposal by passing its local path via `contentPath`. The bridge reads the file and uploads its content to Chorus — do not re-output the file body inline.
+After local artifacts are written, mirror each file to the Chorus proposal by passing its local path via `contentPath`. Prefer OpenCode's native `write` / `edit` tools over bash-based file writes when updating those local artifacts. The bridge reads the file and uploads its content to Chorus — do not re-output the file body inline.
 
 For a new draft:
 

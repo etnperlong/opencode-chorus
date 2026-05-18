@@ -4,6 +4,8 @@ import { loadChorusConfig } from "./config/config-loader"
 import { isMissingRequiredConfigError } from "./config/error-guards"
 import { createPluginConfigApplier } from "./config/plugin-config"
 import { createPluginEventHook } from "./hooks/plugin-event-hook"
+import { createPermissionAskHook } from "./hooks/permission-ask-hook"
+import { createSystemTransformHook } from "./hooks/system-transform-hook"
 import { createToolExecuteAfterHook } from "./hooks/tool-execute-after-hook"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { SessionLifecycle } from "./lifecycle/session-lifecycle"
@@ -92,6 +94,12 @@ export const createPlugin: Plugin = async (ctx, options) => {
     },
     chorusClient,
   })
+  const permissionAskHook = createPermissionAskHook({
+    stagingDir: stateStore.paths.stagingDir,
+  })
+  const systemTransformHook = createSystemTransformHook({
+    stagingDir: stateStore.paths.stagingDir,
+  })
   if (loadedConfig.metadata.apiKeySource === "chorus.json") {
     await logger.warn("Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.")
   }
@@ -113,7 +121,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
   return {
     config: applyPluginConfig,
     event: eventHook,
+    "permission.ask": permissionAskHook,
     "tool.execute.after": toolExecuteAfterHook,
+    "experimental.chat.system.transform": systemTransformHook,
     tool: lazyBridge.tools,
   }
 }

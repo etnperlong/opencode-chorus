@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - Added a per-project **Chorus document staging directory** (`<globalStateRoot>/<projectKey>/staging/`) that is created when a session starts and deleted when it ends. Staging files live outside the workspace, keeping the project clean and avoiding a second source of truth alongside Chorus.
 - Injected the staging directory absolute path into the agent's Chorus context summary so agents always know where to write document bodies for non-OpenSpec workflows.
 - Added `stagingDir` field to `ChorusPaths`, `ensureStagingDir()` and `cleanupStagingDir()` methods to `StateStore`, and a `stagingDir` option to `CreateChorusLazyBridgeToolsOptions`.
+- Added a `permission.ask` hook that auto-allows OpenCode `write` / `edit` permission requests targeting the Chorus staging directory, removing redundant prompts during document-upload workflows.
 
 ### Changed
 
@@ -23,6 +24,7 @@ All notable changes to this project will be documented in this file.
 - `chorus_tool_execute` rejects inline `content` for managed document tools with an explicit error, and validates that `contentPath` resolves to a readable file inside the workspace or the Chorus staging directory.
 - Updated bundled skills (`chorus-proposal`, `chorus-yolo`, `chorus-review`, `chorus-develop`, `chorus-openspec`) to use `contentPath`-based document upload flows: non-OpenSpec skills write to the Chorus staging directory; `chorus-openspec` retains local OpenSpec artifact paths.
 - Updated `chorus/SKILL.md` execution rules and `README.md` to document the global path-only document upload contract, the staging directory lifecycle, and the two-mode usage (staging for free-form, artifact paths for OpenSpec).
+- Injected system-level guidance that tells agents to prefer OpenCode's native `write` / `edit` tools over bash-based file writes, especially when preparing `contentPath` uploads in the Chorus staging directory.
 
 ### Fixed
 

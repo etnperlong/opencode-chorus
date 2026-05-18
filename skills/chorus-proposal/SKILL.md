@@ -118,12 +118,12 @@ Before adding document drafts, check whether this repository should use OpenSpec
 
 **Free-form mode branch:**
 
-- Continue to Step 2: write PRD / tech design / spec content to a file in the Chorus staging directory (injected at session start), then pass its absolute path via `contentPath` in `chorus_pm_add_document_draft` calls. Do not write document drafts to the project workspace.
+- Continue to Step 2: write PRD / tech design / spec content to a file in the Chorus staging directory (injected at session start), then pass its absolute path via `contentPath` in `chorus_pm_add_document_draft` calls. Use OpenCode's native `write` / `edit` tools for these staging files when possible. Do not write document drafts to the project workspace.
 - Continue to Step 3 and write task drafts directly in Chorus.
 
 ### Step 2: Add Document Drafts
 
-Write each document to a file in the Chorus staging directory first, then add it as a draft by passing the file path via `contentPath`. The Chorus staging directory is injected into your context at session start — use that absolute path. The bridge reads the file and uploads its content; the file is deleted when the session ends.
+Write each document to a file in the Chorus staging directory first, then add it as a draft by passing the file path via `contentPath`. The Chorus staging directory is injected into your context at session start — use that absolute path. Prefer OpenCode's native `write` / `edit` tools over bash-based file writes when preparing these files. The bridge reads the file and uploads its content; the file is deleted when the session ends.
 
 ```
 # Write the PRD to the staging directory first (use the injected <chorus-staging-dir> path), then:
