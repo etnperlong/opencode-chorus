@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Added `chorus-openspec` bundled skill for OpenSpec-aware proposal authoring, document draft mirroring, document update guidance, and archive reminders.
+- Added TypeScript OpenSpec environment detection helpers for `openspec/` directory and `openspec` CLI availability checks.
+
+### Changed
+
+- Updated bundled Chorus skills to upstream skill metadata version `0.8.3` and documented the Chorus v0.8 permission matrix and role presets.
+- Expanded proposal and task reviewer prompts with stronger review procedures, anti-rubber-stamp guidance, hallucination checks, adversarial probes, and structured output templates.
+- Increased reviewer sub-agent step budgets to 40 for proposal reviews and 50 for task reviews.
+- Updated proposal, develop, and yolo workflow skills with OpenSpec-aware branching and document sync guidance.
+
+### Fixed
+
+- Adapted `chorus_checkin` parsing for Chorus v0.8 response shapes, including grouped permission matrices, nested `agent.owner`, and `ideaTracker` project summaries.
+- Removed the obsolete session file write/delete path that depended on removed `checkin.session.uuid` data.
+
 ## v0.3.2 - 2026-05-05
 
 ### Changed
