@@ -141,10 +141,10 @@ Each task and proposal includes a `commentCount` field — use it to decide whic
     ```
 
    If the proposal description or comments include `OpenSpec change slug: <slug>`, treat local OpenSpec files as the document source of truth. When implementation reveals a required document update:
-   - In the OpenSpec change directory for `<slug>`, update `proposal.md`, `design.md`, or `specs/**/spec.md` first.
-   - Then mirror the changed content back to Chorus using the matching document update tool. For draft proposals, use `chorus_pm_update_document_draft`; for approved documents, use the available document update/governance path or create a follow-up proposal if the change alters approved scope.
-   - Do not update Chorus docs without updating the local OpenSpec artifact first.
-   - Add a task comment if the mirror sync is blocked or requires PM/admin input.
+    - In the OpenSpec change directory for `<slug>`, update `proposal.md`, `design.md`, or `specs/**/spec.md` first.
+    - Then mirror the updated local file back to Chorus using `contentPath`. For draft proposals, use `chorus_pm_update_document_draft({ ..., contentPath: "<path>" })`; for approved documents, use the available document update/governance path or create a follow-up proposal if the change alters approved scope.
+    - Do not update Chorus docs without updating the local OpenSpec artifact first.
+    - Add a task comment if the mirror sync is blocked or requires PM/admin input.
 
 5. **Read project documents** (PRD, tech design, ADR):
     ```

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { SessionLifecycle } from "../../src/lifecycle/session-lifecycle"
@@ -253,6 +253,57 @@ describe("SessionLifecycle", () => {
       expect(messages).toEqual([
         "Chorus context: OpenCode connected; 0 unread notifications; OpenCode-Chorus has 1 task.",
       ])
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+  it("includes the staging directory path in the context summary when provided", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-"))
+    const stateStore = new StateStore(rootDir, ".chorus")
+    await stateStore.init()
+    await stateStore.updateOpenCodeState((state) => ({
+      ...state,
+      sessionContext: {
+        source: "chorus_checkin",
+        runtimeSessionId: "s-staging",
+        lastRefreshedAt: "2026-01-01T00:00:00.000Z",
+        agent: { name: "OpenCode" },
+        projects: [],
+        notifications: { unread: 0 },
+      },
+    }))
+    const lifecycle = new SessionLifecycle(stateStore, new FakeChorusClient() as never, "http://localhost:8637")
+    const messages: string[] = []
+
+    try {
+      await lifecycle.surfaceContextSummary("s-staging", { info: async (m) => { messages.push(m) } }, "/chorus/staging")
+
+      expect(messages[0]).toContain("Chorus document staging directory: /chorus/staging")
+      expect(messages[0]).toContain("Files here are deleted when the session ends")
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("cleans up the staging directory when the tracked session stops", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-"))
+    const stateStore = new StateStore(rootDir, ".chorus")
+    await stateStore.init()
+
+    const chorusClient = new FakeChorusClient()
+    const lifecycle = new SessionLifecycle(stateStore, chorusClient as never, "http://localhost:8637")
+
+    try {
+      await lifecycle.start("s-cleanup")
+
+      // Create a staging file to verify cleanup
+      const stagingDir = stateStore.paths.stagingDir
+      await writeFile(join(stagingDir, "draft.md"), "# Draft")
+
+      await lifecycle.stop("s-cleanup")
+
+      // Staging dir should be gone
+      await expect(access(stagingDir)).rejects.toThrow()
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

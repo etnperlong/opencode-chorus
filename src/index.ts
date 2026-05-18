@@ -50,6 +50,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
         }
       : undefined,
     chorusUrl: config.chorusUrl,
+    stagingDir: stateStore.paths.stagingDir,
   })
   const sessionLifecycle = new SessionLifecycle(stateStore, chorusClient, config.chorusUrl)
   const planningLifecycle = new PlanningLifecycle(stateStore)
@@ -70,6 +71,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     stateStore,
     sessionLifecycle,
     logger,
+    stagingDir: stateStore.paths.stagingDir,
     onSessionStartup: async () => {
       await lazyBridge.refresh()
     },

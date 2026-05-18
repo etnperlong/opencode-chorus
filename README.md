@@ -124,6 +124,16 @@ The plugin no longer injects a remote `mcp.chorus` server into OpenCode by defau
 
 For example, to update a task status, first call `chorus_tools`, then inspect `chorus_update_task` with `chorus_tool_get`, then execute it through the bridge. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
 
+#### Document Body Uploads Are Path-Only
+
+The four managed document write tools — `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` — require a `contentPath` parameter instead of inline `content`.
+
+**For non-OpenSpec workflows**, write the document body to a file in the Chorus staging directory and pass its absolute path via `contentPath`. The plugin injects the staging directory path at session start (in the Chorus context summary). The bridge reads the file and injects its content into the remote Chorus call. Staging files are outside the workspace and are deleted automatically when the session ends.
+
+**For OpenSpec workflows** (`chorus-openspec`), pass the local OpenSpec artifact path (e.g., `openspec/changes/<slug>/proposal.md`) directly.
+
+Passing inline `content` to any of these tools returns a local error and stops the call before it reaches the Chorus server. Paths outside the workspace root and the Chorus staging directory are also rejected.
+
 ### 3. Restart OpenCode
 
 After installing the plugin and setting your credentials, restart OpenCode.

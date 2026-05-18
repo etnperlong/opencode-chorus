@@ -118,28 +118,28 @@ Before adding document drafts, check whether this repository should use OpenSpec
 
 **Free-form mode branch:**
 
-- Continue to Step 2 and write PRD / tech design / spec content directly in `chorus_pm_add_document_draft` calls.
+- Continue to Step 2: write PRD / tech design / spec content to a file in the Chorus staging directory (injected at session start), then pass its absolute path via `contentPath` in `chorus_pm_add_document_draft` calls. Do not write document drafts to the project workspace.
 - Continue to Step 3 and write task drafts directly in Chorus.
 
 ### Step 2: Add Document Drafts
 
-Add document drafts one at a time:
+Write each document to a file in the Chorus staging directory first, then add it as a draft by passing the file path via `contentPath`. The Chorus staging directory is injected into your context at session start — use that absolute path. The bridge reads the file and uploads its content; the file is deleted when the session ends.
 
 ```
-# Add PRD
+# Write the PRD to the staging directory first (use the injected <chorus-staging-dir> path), then:
 chorus_pm_add_document_draft({
   proposalUuid: "<proposal-uuid>",
   type: "prd",
   title: "PRD: <Feature Name>",
-  content: "# PRD: <Feature Name>\n\n## Background\n...\n## Requirements\n..."
+  contentPath: "<chorus-staging-dir>/prd.md"
 })
 
-# Add Tech Design
+# Write the Tech Design first, then:
 chorus_pm_add_document_draft({
   proposalUuid: "<proposal-uuid>",
   type: "tech_design",
   title: "Tech Design: <Feature Name>",
-  content: "# Technical Design\n\n## Architecture\n...\n## Implementation\n..."
+  contentPath: "<chorus-staging-dir>/design.md"
 })
 ```
 
@@ -180,25 +180,11 @@ chorus_pm_add_task_draft({
 # Review current state
 chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
 
-# Update a document draft
+# Update a document draft — write the updated content to a staging file first, then:
 chorus_pm_update_document_draft({
   proposalUuid: "<proposal-uuid>",
   draftUuid: "<draft-uuid>",
-  content: "Updated content..."
-})
-
-# Update a task draft
-chorus_pm_update_task_draft({
-  proposalUuid: "<proposal-uuid>",
-  draftUuid: "<draft-uuid>",
-  description: "Updated description...",
-  dependsOnDraftUuids: ["<other-draft-uuid>"]
-})
-
-# Remove a draft
-chorus_pm_remove_task_draft({
-  proposalUuid: "<proposal-uuid>",
-  draftUuid: "<draft-uuid>"
+  contentPath: "<chorus-staging-dir>/prd.md"
 })
 ```
 
@@ -252,9 +238,9 @@ After submission in OpenCode, the plugin auto-launches `proposal-reviewer` when 
    ```
    This returns the proposal to `draft` status. PM agents can only reject their own proposals; admin agents can reject any proposal.
 
-3. **Revise the drafts:**
+3. **Revise the drafts** (write updated content to staging files first, then upload via `contentPath`):
    ```
-   chorus_pm_update_document_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", content: "..." })
+   chorus_pm_update_document_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", contentPath: "<chorus-staging-dir>/prd.md" })
    chorus_pm_update_task_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", ... })
    ```
 

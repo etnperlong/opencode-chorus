@@ -49,7 +49,7 @@ const expectedMetadata: Record<
     keywords: "openspec,spec-driven,document-drafts,mirror-sync,archive,proposal",
     tools:
       "chorus_pm_add_document_draft,chorus_pm_update_document_draft,chorus_pm_add_task_draft,chorus_pm_update_task_draft",
-    sentinels: ["## Detect OpenSpec Mode", "openspec new change", "Mirror Sync To Chorus Drafts"],
+    sentinels: ["## Detect OpenSpec Mode", "openspec new change", "Mirror Sync To Chorus Drafts", "contentPath"],
   },
   "chorus-proposal": {
     workflow: "planning",
@@ -173,7 +173,7 @@ describe("bundled skill metadata", () => {
       expect(source).not.toContain(".mcp.json")
       expect(source).not.toContain(".claude")
       expect(source).not.toContain("~/.claude")
-      expect(source).not.toMatch(/\/(idea|proposal|develop|quick-dev|review|yolo)\b/)
+      expect(source).not.toMatch(/\/(idea|proposal|develop|quick-dev|review|yolo)(?![\w.])/)
     }
 
     const chorusSource = await readFile(join(skillsDir, "chorus", "SKILL.md"), "utf8")

@@ -163,6 +163,10 @@ Projects can be organized into **Project Groups** — a single-level grouping th
 | `chorus_get_documents` | List project documents (filterable by type: prd, tech_design, adr, spec, guide) |
 | `chorus_get_document` | Get a single document's content |
 
+> **Document body uploads are path-only.** The four managed document write tools — `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` — require a `contentPath` parameter instead of inline `content`. For non-OpenSpec workflows, write the document body to a file in the Chorus staging directory (injected at session start) and pass its absolute path via `contentPath`. The bridge reads the file and forwards its content to Chorus. Passing inline `content` to these tools returns an error.
+
+**Staging directory:** The plugin injects the Chorus document staging directory path at session start (visible in your context summary). Files written there are outside the project workspace and are automatically deleted when the session ends. Use this directory for all free-form document content — it keeps the project clean and avoids creating a second source of truth alongside Chorus.
+
 ### Proposals
 
 | Tool | Purpose |
@@ -367,6 +371,7 @@ Chorus integrations share lifecycle concepts, but runtime wiring differs. For Op
 10. **Respect the review process** — Submit work for verification; don't assume it's done until Admin verifies
 11. **Always use OpenCode question tool for human interaction** — NEVER display questions as plain text; use interactive radio buttons
 12. **Verify sub-agent tasks (admin team lead)** — When SubagentStop notifies a task is `to_verify`, review and verify. Tasks in `to_verify` do NOT unblock downstream — only `done` does.
+13. **Document body uploads are path-only** — For `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document`, write the document body to a file in the Chorus staging directory (injected at session start) and pass its absolute path via `contentPath`. Never use inline `content` for these tools.
 
 ---
 

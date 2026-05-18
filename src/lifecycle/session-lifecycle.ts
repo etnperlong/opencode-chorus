@@ -19,6 +19,7 @@ export class SessionLifecycle {
     if (!options.replaceExisting && !shouldStartMainSession(current.mainSession.runtimeSessionId, runtimeSessionId)) return
 
     const checkin = await this.chorusClient.callTool("chorus_checkin")
+    await this.stateStore.ensureStagingDir()
     const sessionContext = buildSessionContext(checkin, runtimeSessionId)
 
     await this.stateStore.updateOpenCodeState((state) => ({
@@ -41,13 +42,13 @@ export class SessionLifecycle {
     }))
   }
 
-  async surfaceContextSummary(runtimeSessionId: string, logger: Pick<Logger, "info">): Promise<void> {
+  async surfaceContextSummary(runtimeSessionId: string, logger: Pick<Logger, "info">, stagingDir?: string): Promise<void> {
     const state = await this.stateStore.readOpenCodeState()
     const context = state.sessionContext
     if (!context || context.runtimeSessionId !== runtimeSessionId) return
     if (context.lastSurfacedRuntimeSessionId === runtimeSessionId) return
 
-    await logger.info(formatSessionContextSummary(context))
+    await logger.info(formatSessionContextSummary(context, stagingDir))
     await this.stateStore.updateOpenCodeState((current) => {
       if (current.sessionContext?.runtimeSessionId !== runtimeSessionId) return current
       return {
@@ -77,5 +78,6 @@ export class SessionLifecycle {
 
     if (!stopped) return
     await this.chorusClient.disconnect()
+    await this.stateStore.cleanupStagingDir()
   }
 }

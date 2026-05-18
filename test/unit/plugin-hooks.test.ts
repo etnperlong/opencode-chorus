@@ -147,9 +147,11 @@ describe("plugin hooks", () => {
       expect(logCalls).toContainEqual(
         expect.objectContaining({
           level: "info",
-          message: "Chorus context: OpenCode connected; 1 unread notification; OpenCode-Chorus has 2 tasks and 1 pending proposal.",
+          message: expect.stringContaining("Chorus context: OpenCode connected; 1 unread notification; OpenCode-Chorus has 2 tasks and 1 pending proposal."),
         }),
       )
+      const contextSummaryCall = logCalls.find((call) => call.message?.startsWith("Chorus context:"))
+      expect(contextSummaryCall?.message).toContain("Chorus document staging directory:")
       expect(logCalls.filter((call) => call.message?.startsWith("Chorus context:"))).toHaveLength(1)
     } finally {
       await rm(rootDir, { recursive: true, force: true })

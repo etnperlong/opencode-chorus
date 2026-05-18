@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - Added `chorus-openspec` bundled skill for OpenSpec-aware proposal authoring, document draft mirroring, document update guidance, and archive reminders.
 - Added TypeScript OpenSpec environment detection helpers for `openspec/` directory and `openspec` CLI availability checks.
+- Added `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` as **path-managed document tools** in the lazy Chorus bridge. Agents pass a `contentPath` file path; the bridge reads the file and injects its content as the real remote `content` field before forwarding the call.
+- Added a per-project **Chorus document staging directory** (`<globalStateRoot>/<projectKey>/staging/`) that is created when a session starts and deleted when it ends. Staging files live outside the workspace, keeping the project clean and avoiding a second source of truth alongside Chorus.
+- Injected the staging directory absolute path into the agent's Chorus context summary so agents always know where to write document bodies for non-OpenSpec workflows.
+- Added `stagingDir` field to `ChorusPaths`, `ensureStagingDir()` and `cleanupStagingDir()` methods to `StateStore`, and a `stagingDir` option to `CreateChorusLazyBridgeToolsOptions`.
 
 ### Changed
 
@@ -15,6 +19,10 @@ All notable changes to this project will be documented in this file.
 - Expanded proposal and task reviewer prompts with stronger review procedures, anti-rubber-stamp guidance, hallucination checks, adversarial probes, and structured output templates.
 - Increased reviewer sub-agent step budgets to 40 for proposal reviews and 50 for task reviews.
 - Updated proposal, develop, and yolo workflow skills with OpenSpec-aware branching and document sync guidance.
+- `chorus_tool_get` now returns a bridge-local schema overlay for the four managed document tools: `contentPath` replaces `content`, with `contentPath` required for `chorus_pm_add_document_draft` and optional for the other three.
+- `chorus_tool_execute` rejects inline `content` for managed document tools with an explicit error, and validates that `contentPath` resolves to a readable file inside the workspace or the Chorus staging directory.
+- Updated bundled skills (`chorus-proposal`, `chorus-yolo`, `chorus-review`, `chorus-develop`, `chorus-openspec`) to use `contentPath`-based document upload flows: non-OpenSpec skills write to the Chorus staging directory; `chorus-openspec` retains local OpenSpec artifact paths.
+- Updated `chorus/SKILL.md` execution rules and `README.md` to document the global path-only document upload contract, the staging directory lifecycle, and the two-mode usage (staging for free-form, artifact paths for OpenSpec).
 
 ### Fixed
 

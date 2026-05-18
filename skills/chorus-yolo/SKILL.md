@@ -237,37 +237,38 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    - `openspec/changes/<slug>/specs/**/spec.md`
    - `openspec/changes/<slug>/tasks.md`
 
-   Mirror documents to Chorus:
-   ```
-   chorus_pm_add_document_draft({
-     proposalUuid: "<proposal-uuid>",
-     type: "prd",
-     title: "PRD: <feature>",
-     content: "<contents of proposal.md>"
-   })
-   chorus_pm_add_document_draft({
-     proposalUuid: "<proposal-uuid>",
-     type: "tech_design",
-     title: "Tech Design: <feature>",
-     content: "<contents of design.md>"
-   })
-   chorus_pm_add_document_draft({
-     proposalUuid: "<proposal-uuid>",
-     type: "spec",
-     title: "Spec: <capability>",
-     content: "<contents of specs/.../spec.md>"
-   })
-   ```
+   Mirror documents to Chorus by passing local file paths via `contentPath` — do not re-output the file bodies inline:
+    ```
+    chorus_pm_add_document_draft({
+      proposalUuid: "<proposal-uuid>",
+      type: "prd",
+      title: "PRD: <feature>",
+      contentPath: "openspec/changes/<slug>/proposal.md"
+    })
+    chorus_pm_add_document_draft({
+      proposalUuid: "<proposal-uuid>",
+      type: "tech_design",
+      title: "Tech Design: <feature>",
+      contentPath: "openspec/changes/<slug>/design.md"
+    })
+    chorus_pm_add_document_draft({
+      proposalUuid: "<proposal-uuid>",
+      type: "spec",
+      title: "Spec: <capability>",
+      contentPath: "openspec/changes/<slug>/specs/<capability>/spec.md"
+    })
+    ```
 
    Convert `tasks.md` into task drafts using `chorus_pm_add_task_draft`, preserving dependencies.
 
-4. **Free-form mode: add tech design document draft inline:**
+4. **Free-form mode: write the tech design to the Chorus staging directory and add it via `contentPath`:**
    ```
+   # Write the tech design content to a file in <chorus-staging-dir> first, then:
    chorus_pm_add_document_draft({
      proposalUuid: "<proposal-uuid>",
      type: "tech_design",
      title: "Tech Design: <feature>",
-     content: "<markdown tech design covering architecture, data model, API, module contracts>"
+     contentPath: "<chorus-staging-dir>/design.md"
    })
    ```
 
@@ -341,10 +342,15 @@ After `chorus_pm_submit_proposal`, the plugin auto-launches `proposal-reviewer` 
        reviewNote: "FAIL from reviewer. Fixing BLOCKERs: <list>"
      })
      ```
-     Revise the drafts (`chorus_pm_update_document_draft`, `chorus_pm_update_task_draft`) to address each BLOCKER, then resubmit:
-     ```
-     chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
-     ```
+       Revise the drafts (write updated content to staging files first, then upload via `contentPath`):
+      ```
+      chorus_pm_update_document_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", contentPath: "<chorus-staging-dir>/design.md" })
+      chorus_pm_update_task_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", ... })
+      ```
+      Then resubmit:
+      ```
+      chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
+      ```
       After resubmission, the plugin auto-launches and waits for the Round 2 reviewer gate.
 
 3. **Max rounds:** Loop up to `maxProposalReviewRounds` (from plugin config, default 3). If exhausted:

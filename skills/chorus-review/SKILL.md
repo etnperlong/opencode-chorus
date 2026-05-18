@@ -315,7 +315,8 @@ chorus_admin_delete_idea({ ideaUuid: "<idea-uuid>" })
 
 ```
 chorus_admin_delete_document({ documentUuid: "<doc-uuid>" })
-chorus_pm_update_document({ documentUuid: "<doc-uuid>", content: "Updated..." })
+# Write the updated content to the Chorus staging directory first, then:
+chorus_pm_update_document({ documentUuid: "<doc-uuid>", contentPath: "<chorus-staging-dir>/updated.md" })
 ```
 
 ---

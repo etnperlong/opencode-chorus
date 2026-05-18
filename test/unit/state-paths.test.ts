@@ -17,6 +17,7 @@ describe("resolveStatePaths", () => {
     expect(paths.project.canonicalDirectory).toBe("/workspace/Repo")
     expect(paths.project.worktree).toBe("/workspace/Repo")
     expect(paths.rootDir).toMatch(/^\/var\/state\/opencode\/chorus\/Repo-[a-f0-9]{12}$/)
+    expect(paths.stagingDir).toBe(`${paths.rootDir}/staging`)
     expect(paths.stateFile).toBe(`${paths.rootDir}/opencode-state.json`)
   })
 

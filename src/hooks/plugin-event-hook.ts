@@ -18,6 +18,7 @@ type CreatePluginEventHookOptions = {
   stateStore: StateStore
   sessionLifecycle: SessionLifecycle
   logger: Pick<Logger, "debug" | "info" | "warn">
+  stagingDir?: string
   onSessionStartup?: () => Promise<void>
   onSessionReady?: (sessionId: string) => Promise<void>
   onSessionIdle?: (sessionId: string) => Promise<void>
@@ -46,7 +47,7 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
           await markInterruptedReviews(options.stateStore)
           await options.sessionLifecycle.start(sessionId, { replaceExisting })
           if (options.enableSessionContextSummary) {
-            await options.sessionLifecycle.surfaceContextSummary(sessionId, options.logger)
+            await options.sessionLifecycle.surfaceContextSummary(sessionId, options.logger, options.stagingDir)
           }
           try {
             await options.onSessionStartup?.()

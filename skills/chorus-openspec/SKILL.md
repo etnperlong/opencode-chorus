@@ -76,7 +76,7 @@ When OpenSpec mode is active, create and maintain local OpenSpec artifacts first
 
 ## Mirror Sync To Chorus Drafts
 
-After local artifacts are written, read each file and mirror it to the Chorus proposal.
+After local artifacts are written, mirror each file to the Chorus proposal by passing its local path via `contentPath`. The bridge reads the file and uploads its content to Chorus — do not re-output the file body inline.
 
 For a new draft:
 
@@ -85,7 +85,7 @@ chorus_pm_add_document_draft({
   proposalUuid: "<proposal-uuid>",
   type: "prd" | "tech_design" | "spec",
   title: "<mapped title>",
-  content: "<exact markdown content from local OpenSpec file>"
+  contentPath: "openspec/changes/<slug>/proposal.md"   // or design.md / specs/.../spec.md
 })
 ```
 
@@ -94,7 +94,7 @@ For task drafts, translate `tasks.md` into `chorus_pm_add_task_draft` calls. Pre
 Mirror rules:
 
 - Update local OpenSpec files first.
-- Then sync the exact local content to Chorus.
+- Then sync by passing the local file path via `contentPath` — never re-output the file body inline.
 - Add or update task drafts only after the relevant docs are current.
 - Add a proposal comment if a mirror sync is partial or blocked.
 
@@ -108,7 +108,7 @@ If the proposal is still in draft, edit local OpenSpec files first and mirror wi
 chorus_pm_update_document_draft({
   proposalUuid: "<proposal-uuid>",
   draftUuid: "<draft-uuid>",
-  content: "<latest markdown content from local OpenSpec file>"
+  contentPath: "openspec/changes/<slug>/proposal.md"   // path to the updated local file
 })
 ```
 

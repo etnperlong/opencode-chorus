@@ -19,6 +19,7 @@ export type ProjectStateMetadata = {
 export type ChorusPaths = {
   mode: StateMode
   rootDir: string
+  stagingDir: string
   stateFile: string
   sharedFile: string
   legacyClaudeStateFile: string
@@ -103,6 +104,7 @@ function buildPaths(input: {
   return {
     mode,
     rootDir,
+    stagingDir: pathApi.join(rootDir, "staging"),
     stateFile: pathApi.join(rootDir, "opencode-state.json"),
     sharedFile: pathApi.join(rootDir, "shared.json"),
     legacyClaudeStateFile: pathApi.join(rootDir, "state.json"),

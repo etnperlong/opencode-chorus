@@ -1,6 +1,19 @@
+import { readFile, stat } from "node:fs/promises"
+import path from "node:path"
 import { tool, type ToolDefinition, type ToolResult } from "@opencode-ai/plugin"
 import type { ChorusMcpToolDefinition } from "../chorus/mcp-client"
 import { resolveChorusToolScope, type ChorusToolScope } from "../chorus/tool-scope"
+
+// Tools that replace agent-visible `content` with `contentPath` at the bridge boundary.
+const MANAGED_DOCUMENT_TOOLS = new Set([
+  "chorus_pm_create_document",
+  "chorus_pm_add_document_draft",
+  "chorus_pm_update_document_draft",
+  "chorus_pm_update_document",
+])
+
+// Subset of managed tools where a document body is always required.
+const CONTENT_PATH_REQUIRED_TOOLS = new Set(["chorus_pm_add_document_draft"])
 
 type ChorusLazyBridgeClient = {
   listTools(): Promise<ChorusMcpToolDefinition[]>
@@ -17,6 +30,8 @@ type CreateChorusLazyBridgeToolsOptions = {
     showToast(input: { title?: string; message?: string; variant?: "info" | "success" | "warning" | "error"; duration?: number }): Promise<unknown>
   }
   chorusUrl?: string
+  /** Chorus-managed staging directory; paths inside it are accepted alongside workspace paths. */
+  stagingDir?: string
 }
 
 type ToolSearchResult = {
@@ -27,6 +42,103 @@ type ToolSearchResult = {
 export type ChorusLazyBridge = {
   tools: Record<string, ToolDefinition>
   refresh(): Promise<ChorusMcpToolDefinition[]>
+}
+
+// Apply the contentPath overlay to a managed document tool definition.
+// Removes the remote `content` field and exposes `contentPath` instead.
+function applyContentPathOverlay(toolDef: ChorusMcpToolDefinition): ChorusMcpToolDefinition {
+  if (!MANAGED_DOCUMENT_TOOLS.has(toolDef.name)) return toolDef
+
+  const schema = toolDef.inputSchema
+  const originalRequired: string[] = Array.isArray(schema.required)
+    ? schema.required.filter((f): f is string => typeof f === "string")
+    : []
+  const originalProperties = isRecord(schema.properties) ? { ...schema.properties } : {}
+
+  delete originalProperties.content
+  originalProperties.contentPath = {
+    type: "string",
+    description:
+      "Workspace-relative (or absolute within workspace) path to a local Markdown file whose content will be uploaded as the document body. The bridge reads this file and injects its content into the remote call.",
+  }
+
+  const required = originalRequired.filter((f) => f !== "content")
+  if (CONTENT_PATH_REQUIRED_TOOLS.has(toolDef.name) && !required.includes("contentPath")) {
+    required.push("contentPath")
+  }
+
+  return {
+    ...toolDef,
+    inputSchema: { ...schema, required, properties: originalProperties },
+  }
+}
+
+// Validate and rewrite arguments for a managed document tool call.
+// Reads the file at `contentPath`, injects its text as the real remote `content`,
+// and strips `contentPath` before the Chorus MCP call.
+// Accepts paths inside `directory` (workspace) or `stagingDir` (Chorus-managed staging area).
+export async function rewriteDocumentArgs(
+  toolName: string,
+  args: Record<string, unknown>,
+  directory: string,
+  stagingDir?: string,
+): Promise<Record<string, unknown>> {
+  if (!MANAGED_DOCUMENT_TOOLS.has(toolName)) return args
+
+  if ("content" in args) {
+    throw new Error(
+      `Tool "${toolName}" requires \`contentPath\` — inline \`content\` is not accepted. ` +
+        `Write your document to a local file and pass its workspace path via \`contentPath\`.`,
+    )
+  }
+
+  const { contentPath, ...rest } = args
+
+  if (contentPath === undefined || contentPath === null) {
+    if (CONTENT_PATH_REQUIRED_TOOLS.has(toolName)) {
+      throw new Error(
+        `Tool "${toolName}" requires \`contentPath\`. ` +
+          `Write your document to a local file and pass its workspace-relative path.`,
+      )
+    }
+    return args
+  }
+
+  if (typeof contentPath !== "string") {
+    throw new Error(`\`contentPath\` must be a string file path.`)
+  }
+
+  const resolvedPath = path.resolve(directory, contentPath)
+
+  const isInWorkspace = !path.relative(directory, resolvedPath).startsWith("..")
+  const isInStaging = stagingDir ? !path.relative(stagingDir, resolvedPath).startsWith("..") : false
+
+  if (!isInWorkspace && !isInStaging) {
+    const allowed = stagingDir
+      ? `inside the workspace (${directory}) or the Chorus staging directory (${stagingDir})`
+      : `inside the current workspace (${directory})`
+    throw new Error(`\`contentPath\` resolves outside the permitted paths. Files must be ${allowed}. Got: ${contentPath}`)
+  }
+
+  let fileInfo: { isDirectory(): boolean }
+  try {
+    fileInfo = await stat(resolvedPath)
+  } catch {
+    throw new Error(`\`contentPath\` file not found: ${contentPath}`)
+  }
+
+  if (fileInfo.isDirectory()) {
+    throw new Error(`\`contentPath\` points to a directory, not a file: ${contentPath}`)
+  }
+
+  let content: string
+  try {
+    content = await readFile(resolvedPath, "utf-8")
+  } catch {
+    throw new Error(`Cannot read \`contentPath\` file: ${contentPath}`)
+  }
+
+  return { ...rest, content }
 }
 
 export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptions): ChorusLazyBridge {
@@ -88,7 +200,7 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
         const index = await readToolIndex()
         const target = index.find((item) => item.name === args.toolName)
         if (!target) throw createToolNotFoundError(args.toolName)
-        return formatToolResult(describeTool(target))
+        return formatToolResult(describeTool(applyContentPathOverlay(target)))
       },
     }),
 
@@ -101,13 +213,15 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
           .optional()
           .describe("Arguments for the Chorus tool"),
       },
-      async execute(args) {
+      async execute(args, ctx) {
         const index = await readToolIndex()
         const toolName = args.toolName
         const target = index.find((item) => item.name === toolName)
         if (!target) throw createToolNotFoundError(args.toolName)
 
-        const normalizedArgs = normalizeToolArguments(toolName, args.arguments ?? {}, target.inputSchema)
+        const rawArgs = args.arguments ?? {}
+        const rewrittenArgs = await rewriteDocumentArgs(toolName, rawArgs, ctx.directory, options.stagingDir)
+        const normalizedArgs = normalizeToolArguments(toolName, rewrittenArgs, target.inputSchema)
         const scope = await resolveChorusToolScope(options.stateStore)
         const result = await options.chorusClient.callTool(toolName, normalizedArgs, scope)
         return formatToolResult(result, {

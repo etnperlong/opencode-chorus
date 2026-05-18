@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { createChorusLazyBridge, createChorusLazyBridgeTools } from "../../src/tools/lazy-bridge-tools"
+import { mkdtemp, writeFile, mkdir } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { createChorusLazyBridge, createChorusLazyBridgeTools, rewriteDocumentArgs } from "../../src/tools/lazy-bridge-tools"
 
 describe("Chorus lazy bridge tools", () => {
   it("lists Chorus tools from the dynamic MCP tool list", async () => {
@@ -273,6 +276,250 @@ describe("Chorus lazy bridge tools", () => {
   })
 })
 
+describe("managed document tool schema overlay", () => {
+  it("hides content and exposes required contentPath for chorus_pm_add_document_draft", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_add_document_draft" }, createToolContext())
+    const output = readOutput(result)
+
+    expect(output).toContain("contentPath")
+    expect(output).not.toContain('"content"')
+    // contentPath is required for add_document_draft
+    expect(JSON.parse(output).requiredFields).toContain("contentPath")
+  })
+
+  it("hides content and exposes optional contentPath for chorus_pm_update_document_draft", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_update_document_draft" }, createToolContext())
+    const output = JSON.parse(readOutput(result))
+
+    expect(output.optionalFields).toContain("contentPath")
+    expect(output.requiredFields).not.toContain("contentPath")
+    expect(output.requiredFields).not.toContain("content")
+    expect(output.optionalFields).not.toContain("content")
+  })
+
+  it("hides content and exposes optional contentPath for chorus_pm_create_document", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_create_document" }, createToolContext())
+    const output = JSON.parse(readOutput(result))
+
+    expect(output.optionalFields).toContain("contentPath")
+    expect(output.optionalFields).not.toContain("content")
+    expect(output.requiredFields).not.toContain("contentPath")
+  })
+
+  it("hides content and exposes optional contentPath for chorus_pm_update_document", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_update_document" }, createToolContext())
+    const output = JSON.parse(readOutput(result))
+
+    expect(output.optionalFields).toContain("contentPath")
+    expect(output.optionalFields).not.toContain("content")
+  })
+
+  it("does not overlay non-document tools like chorus_update_task", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_update_task" }, createToolContext())
+    const output = readOutput(result)
+
+    expect(output).not.toContain("contentPath")
+  })
+})
+
+describe("managed document tool execute-time rewrite", () => {
+  it("reads the file at contentPath and forwards content to the remote call", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chorus-test-"))
+    const filePath = join(dir, "draft.md")
+    await writeFile(filePath, "# My PRD\n\nSome content.")
+
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools(calls) })
+
+    await tools.chorus_tool_execute!.execute(
+      {
+        toolName: "chorus_pm_add_document_draft",
+        arguments: { proposalUuid: "p-1", type: "prd", title: "My PRD", contentPath: filePath },
+      },
+      createToolContext(dir),
+    )
+
+    expect(calls[0]!.args.content).toBe("# My PRD\n\nSome content.")
+    expect(calls[0]!.args.contentPath).toBeUndefined()
+  })
+
+  it("resolves a relative contentPath against ctx.directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chorus-test-"))
+    await mkdir(join(dir, "docs"))
+    await writeFile(join(dir, "docs", "prd.md"), "# PRD")
+
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools(calls) })
+
+    await tools.chorus_tool_execute!.execute(
+      {
+        toolName: "chorus_pm_add_document_draft",
+        arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "docs/prd.md" },
+      },
+      createToolContext(dir),
+    )
+
+    expect(calls[0]!.args.content).toBe("# PRD")
+    expect(calls[0]!.args.contentPath).toBeUndefined()
+  })
+
+  it("passes through managed tool call without contentPath when content is optional", async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools(calls) })
+
+    await tools.chorus_tool_execute!.execute(
+      {
+        toolName: "chorus_pm_update_document_draft",
+        arguments: { proposalUuid: "p-1", draftUuid: "d-1", title: "New Title" },
+      },
+      createToolContext(),
+    )
+
+    expect(calls[0]!.args).toEqual({ proposalUuid: "p-1", draftUuid: "d-1", title: "New Title" })
+  })
+
+  it("does not interfere with non-document tool arguments", async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools(calls) })
+
+    await tools.chorus_tool_execute!.execute(
+      {
+        toolName: "chorus_update_task",
+        arguments: { taskUuid: "t-1", status: "in_progress" },
+      },
+      createToolContext(),
+    )
+
+    expect(calls[0]!.args).toEqual({ taskUuid: "t-1", status: "in_progress" })
+  })
+})
+
+describe("managed document tool path-only validation", () => {
+  it("rejects inline content for managed document tools", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    await expect(
+      tools.chorus_tool_execute!.execute(
+        {
+          toolName: "chorus_pm_add_document_draft",
+          arguments: { proposalUuid: "p-1", type: "prd", title: "T", content: "inline body" },
+        },
+        createToolContext(),
+      ),
+    ).rejects.toThrow("requires `contentPath`")
+  })
+
+  it("does not make the remote call when inline content is rejected", async () => {
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools(calls) })
+
+    await expect(
+      tools.chorus_tool_execute!.execute(
+        {
+          toolName: "chorus_pm_add_document_draft",
+          arguments: { content: "inline body" },
+        },
+        createToolContext(),
+      ),
+    ).rejects.toThrow()
+
+    expect(calls).toHaveLength(0)
+  })
+
+  it("rejects missing contentPath when it is required", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    await expect(
+      tools.chorus_tool_execute!.execute(
+        {
+          toolName: "chorus_pm_add_document_draft",
+          arguments: { proposalUuid: "p-1", type: "prd", title: "T" },
+        },
+        createToolContext(),
+      ),
+    ).rejects.toThrow(/requires.*contentPath/)
+  })
+
+  it("rejects a contentPath pointing to a non-existent file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chorus-test-"))
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    await expect(
+      tools.chorus_tool_execute!.execute(
+        {
+          toolName: "chorus_pm_add_document_draft",
+          arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "no-such-file.md" },
+        },
+        createToolContext(dir),
+      ),
+    ).rejects.toThrow(/file not found/)
+  })
+
+  it("rejects a contentPath pointing to a directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chorus-test-"))
+    await mkdir(join(dir, "docs"))
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    await expect(
+      tools.chorus_tool_execute!.execute(
+        {
+          toolName: "chorus_pm_add_document_draft",
+          arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "docs" },
+        },
+        createToolContext(dir),
+      ),
+    ).rejects.toThrow(/directory/)
+  })
+
+  it("rejects a contentPath that resolves outside the workspace root", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "chorus-test-"))
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
+
+    await expect(
+      tools.chorus_tool_execute!.execute(
+        {
+          toolName: "chorus_pm_add_document_draft",
+          arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "../../etc/passwd" },
+        },
+        createToolContext(dir),
+      ),
+    ).rejects.toThrow(/outside the permitted/)
+  })
+
+  it("accepts a contentPath inside the stagingDir (outside workspace)", async () => {
+    const workspaceDir = await mkdtemp(join(tmpdir(), "chorus-workspace-"))
+    const stagingDir = await mkdtemp(join(tmpdir(), "chorus-staging-"))
+    const stagingFile = join(stagingDir, "prd.md")
+    await writeFile(stagingFile, "# PRD from staging")
+
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = []
+    const bridge = createChorusLazyBridge({
+      chorusClient: createClientWithDocumentTools(calls),
+      stagingDir,
+    })
+
+    await bridge.tools.chorus_tool_execute!.execute(
+      {
+        toolName: "chorus_pm_add_document_draft",
+        arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: stagingFile },
+      },
+      createToolContext(workspaceDir),
+    )
+
+    expect(calls[0]!.args.content).toBe("# PRD from staging")
+  })
+})
+
 function createClient(calls: Array<{ name: string; args: Record<string, unknown> }> = []) {
   return {
     async listTools() {
@@ -283,6 +530,78 @@ function createClient(calls: Array<{ name: string; args: Record<string, unknown>
       return { ok: true, taskUuid: args.taskUuid } as T
     },
   }
+}
+
+function createClientWithDocumentTools(calls: Array<{ name: string; args: Record<string, unknown> }> = []) {
+  return {
+    async listTools() {
+      return [...createToolDefinitions(), ...createDocumentToolDefinitions()]
+    },
+    async callTool<T>(name: string, args: Record<string, unknown>): Promise<T> {
+      calls.push({ name, args })
+      return { ok: true } as T
+    },
+  }
+}
+
+function createDocumentToolDefinitions() {
+  return [
+    {
+      name: "chorus_pm_add_document_draft",
+      description: "Add a document draft to a proposal",
+      inputSchema: {
+        type: "object",
+        required: ["proposalUuid", "type", "title", "content"],
+        properties: {
+          proposalUuid: { type: "string" },
+          type: { type: "string" },
+          title: { type: "string" },
+          content: { type: "string" },
+        },
+      },
+    },
+    {
+      name: "chorus_pm_update_document_draft",
+      description: "Update a document draft",
+      inputSchema: {
+        type: "object",
+        required: ["proposalUuid", "draftUuid"],
+        properties: {
+          proposalUuid: { type: "string" },
+          draftUuid: { type: "string" },
+          title: { type: "string" },
+          content: { type: "string" },
+        },
+      },
+    },
+    {
+      name: "chorus_pm_create_document",
+      description: "Create a standalone document",
+      inputSchema: {
+        type: "object",
+        required: ["projectUuid", "type", "title"],
+        properties: {
+          projectUuid: { type: "string" },
+          type: { type: "string" },
+          title: { type: "string" },
+          content: { type: "string" },
+        },
+      },
+    },
+    {
+      name: "chorus_pm_update_document",
+      description: "Update document content",
+      inputSchema: {
+        type: "object",
+        required: ["documentUuid"],
+        properties: {
+          documentUuid: { type: "string" },
+          title: { type: "string" },
+          content: { type: "string" },
+        },
+      },
+    },
+  ]
 }
 
 function createToolDefinitions() {
@@ -314,13 +633,13 @@ function createToolDefinitions() {
   ]
 }
 
-function createToolContext() {
+function createToolContext(directory = "/tmp/project") {
   return {
     sessionID: "session-1",
     messageID: "message-1",
     agent: "build",
-    directory: "/tmp/project",
-    worktree: "/tmp/project",
+    directory,
+    worktree: directory,
     abort: new AbortController().signal,
     metadata: () => {},
     ask: (() => {}) as never,

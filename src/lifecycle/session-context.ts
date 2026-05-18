@@ -14,12 +14,19 @@ export function buildSessionContext(checkin: unknown, runtimeSessionId: string, 
   }
 }
 
-export function formatSessionContextSummary(context: SessionContextRecord): string {
+export function formatSessionContextSummary(context: SessionContextRecord, stagingDir?: string): string {
   const agentName = context.agent?.name ?? "Chorus agent"
   const notificationCount = context.notifications?.unread ?? 0
   const project = context.projects[0]
   const projectSummary = project ? formatProjectSummary(project) : "no tracked Chorus projects"
-  return `Chorus context: ${agentName} connected; ${formatCount(notificationCount, "unread notification")}; ${projectSummary}.`
+  const summary = `Chorus context: ${agentName} connected; ${formatCount(notificationCount, "unread notification")}; ${projectSummary}.`
+  if (!stagingDir) return summary
+  return (
+    summary +
+    `\n\nChorus document staging directory: ${stagingDir}\n` +
+    `Write Chorus document bodies to files in this directory and pass the absolute path via \`contentPath\`. ` +
+    `This directory is outside the workspace to keep project files clean. Files here are deleted when the session ends.`
+  )
 }
 
 function readAgent(value: unknown): SessionContextRecord["agent"] {

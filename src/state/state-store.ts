@@ -51,6 +51,14 @@ export class StateStore {
     }
   }
 
+  async ensureStagingDir(): Promise<void> {
+    await mkdir(this.paths.stagingDir, { recursive: true }).catch(() => {})
+  }
+
+  async cleanupStagingDir(): Promise<void> {
+    await rm(this.paths.stagingDir, { recursive: true, force: true }).catch(() => {})
+  }
+
   usesProjectLocalState(): boolean {
     return this.paths.mode === "project"
   }
