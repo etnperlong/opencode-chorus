@@ -1,10 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { resolveStatePaths } from "../../src/state/paths"
 import { StateStore } from "../../src/state/state-store"
+// Capture real values before mock.module() replaces this module for plugin hooks.
+const {
+  ChorusSseListener: RealChorusSseListener,
+  parseSseNotificationChunk,
+} = await import("../../src/notifications/sse-listener")
+type RealChorusSseListenerArgs = ConstructorParameters<typeof RealChorusSseListener>
+type RealChorusSseListenerInstance = InstanceType<typeof RealChorusSseListener>
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
@@ -61,9 +68,30 @@ mock.module("../../src/chorus/mcp-client", () => ({
 }))
 
 mock.module("../../src/notifications/sse-listener", () => ({
+  parseSseNotificationChunk,
   ChorusSseListener: class {
-    async connect() {}
-    disconnect() {}
+    private readonly listener: RealChorusSseListenerInstance
+    private readonly connectToSse: boolean
+
+    constructor(...args: RealChorusSseListenerArgs) {
+      this.listener = new RealChorusSseListener(...args)
+      const options = args[3] ?? {}
+      // Plugin hook tests use default SSE options and should not start a background fetch.
+      // Direct SSE tests set short reconnect delays, so delegate to the real listener there.
+      this.connectToSse = options.initialReconnectDelayMs !== undefined || options.maxReconnectDelayMs !== undefined
+    }
+
+    get status() {
+      return this.listener.status
+    }
+
+    async connect() {
+      if (this.connectToSse) await this.listener.connect()
+    }
+
+    disconnect() {
+      this.listener.disconnect()
+    }
   },
 }))
 
@@ -131,7 +159,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("surfaces compact Chorus context on startup when enabled", async () => {
+  it("does not surface Chorus context on session.created — surfaces via chat.params when chorus agent is used", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -142,16 +170,28 @@ describe("plugin hooks", () => {
       })
 
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-context" } } } } as never)
-      await plugin.event?.({ event: { type: "session.idle", properties: { info: { id: "session-context" } } } } as never)
 
+      // No context log message should appear on session.created
+      expect(logCalls.some((call) => call.message?.startsWith("Chorus context:"))).toBe(false)
+
+      // Trigger readiness via chat.params
+      await plugin["chat.params"]?.(
+        { sessionID: "session-context", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
+
+      // Now context summary should be surfaced
       expect(logCalls).toContainEqual(
         expect.objectContaining({
           level: "info",
-          message: expect.stringContaining("Chorus context: OpenCode connected; 1 unread notification; OpenCode-Chorus has 2 tasks and 1 pending proposal."),
+          message: expect.stringContaining("Chorus context: OpenCode connected"),
         }),
       )
-      const contextSummaryCall = logCalls.find((call) => call.message?.startsWith("Chorus context:"))
-      expect(contextSummaryCall?.message).toContain("Chorus document staging directory:")
+      // Should be surfaced exactly once even with multiple chat.params calls
+      await plugin["chat.params"]?.(
+        { sessionID: "session-context", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
       expect(logCalls.filter((call) => call.message?.startsWith("Chorus context:"))).toHaveLength(1)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -170,7 +210,12 @@ describe("plugin hooks", () => {
 
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-context" } } } } as never)
 
-      await expect(access(pluginStatePath(rootDir))).rejects.toMatchObject({ code: "ENOENT" })
+      // Trigger readiness — context is not logged when disabled
+      await plugin["chat.params"]?.(
+        { sessionID: "session-context", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
+
       expect(logCalls.some((call) => call.message?.startsWith("Chorus context:"))).toBe(false)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -1008,6 +1053,7 @@ describe("plugin hooks", () => {
       expect(plugin["permission.ask"]).toBeFunction()
       expect(plugin["tool.execute.after"]).toBeFunction()
       expect(plugin["experimental.chat.system.transform"]).toBeFunction()
+      expect(plugin["chat.params"]).toBeFunction()
       expect(Object.keys(plugin.tool ?? {}).sort()).toEqual(["chorus_tool_execute", "chorus_tool_get", "chorus_tools"])
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -1034,7 +1080,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("refreshes the lazy bridge tool index on session startup", async () => {
+  it("does NOT refresh the lazy bridge tool index on session startup — readiness is deferred", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -1045,13 +1091,13 @@ describe("plugin hooks", () => {
 
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-lazy" } } } } as never)
 
-      expect(listToolsCalls).toBe(1)
+      expect(listToolsCalls).toBe(0)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
   })
 
-  it("shows lazy bridge connection status through the OpenCode TUI on session startup", async () => {
+  it("refreshes the lazy bridge and shows connection toast when chorus agent is first used via chat.params", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -1060,21 +1106,57 @@ describe("plugin hooks", () => {
         apiKey: "test-key",
       })
 
-      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never)
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-chorus" } } } } as never)
+      expect(listToolsCalls).toBe(0)
+      expect(toastCalls.some((t) => t.title === "Chorus connected")).toBe(false)
 
+      // First chorus agent turn via chat.params triggers readiness
+      await plugin["chat.params"]?.(
+        { sessionID: "session-chorus", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
+
+      expect(listToolsCalls).toBe(1)
       expect(toastCalls).toContainEqual(
         expect.objectContaining({
-          title: "Chorus tools connected",
-          message: "1 tools available",
+          title: "Chorus connected",
           variant: "success",
         }),
       )
+      // Toast body should NOT contain tool counts
+      const toast = toastCalls.find((t) => t.title === "Chorus connected")
+      expect(toast?.message).not.toContain("tools available")
+      expect(toast?.message).not.toContain("tools")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
   })
 
-  it("does not fail session startup when lazy bridge refresh fails", async () => {
+  it("does not repeat readiness on subsequent chorus turns in the same session", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-dedup" } } } } as never)
+
+      const chatParams = { sessionID: "session-dedup", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never }
+      const outputParams = { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} }
+      await plugin["chat.params"]?.(chatParams, outputParams)
+      await plugin["chat.params"]?.(chatParams, outputParams)
+      await plugin["chat.params"]?.(chatParams, outputParams)
+
+      expect(listToolsCalls).toBe(1)
+      expect(toastCalls.filter((t) => t.title === "Chorus connected")).toHaveLength(1)
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("does not fail the chorus agent turn when readiness fails, logs a warning instead", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
     listToolsError = new Error("MCP unavailable")
 
@@ -1084,13 +1166,23 @@ describe("plugin hooks", () => {
         apiKey: "test-key",
       })
 
+      // session.created must not fail even though listTools will fail during readiness
       await expect(
         plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never),
       ).resolves.toBeUndefined()
+
+      // chat.params for chorus should also not throw — error is swallowed with a warning
+      await expect(
+        plugin["chat.params"]?.(
+          { sessionID: "session-1", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+          { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+        ),
+      ).resolves.toBeUndefined()
+
       expect(logCalls).toContainEqual(
         expect.objectContaining({
           level: "warn",
-          message: "Failed to refresh Chorus lazy bridge on session startup",
+          message: "Chorus readiness failed on first chorus agent turn",
         }),
       )
     } finally {
@@ -1181,6 +1273,12 @@ describe("plugin hooks", () => {
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
+  })
+
+  afterAll(() => {
+    // Clean up for later files in the same worker; concurrent direct SSE tests
+    // are protected by the compatible mock above.
+    mock.restore()
   })
 })
 

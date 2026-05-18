@@ -63,13 +63,20 @@ function readProjects(value: unknown): SessionContextRecord["projects"] {
   if (!Array.isArray(value)) return []
   return value.flatMap((item) => {
     if (!isRecord(item) || typeof item.uuid !== "string" || typeof item.name !== "string") return []
+    const taskCount = typeof item.taskCount === "number" ? item.taskCount : typeof item.tasks === "number" ? item.tasks : undefined
+    const pendingProposalCount =
+      typeof item.pendingProposalCount === "number"
+        ? item.pendingProposalCount
+        : typeof item.proposals === "number"
+          ? item.proposals
+          : undefined
     return [
       {
         uuid: item.uuid,
         name: item.name,
         ...(typeof item.ideaCount === "number" ? { ideaCount: item.ideaCount } : {}),
-        ...(typeof item.taskCount === "number" ? { taskCount: item.taskCount } : {}),
-        ...(typeof item.pendingProposalCount === "number" ? { pendingProposalCount: item.pendingProposalCount } : {}),
+        ...(taskCount !== undefined ? { taskCount } : {}),
+        ...(pendingProposalCount !== undefined ? { pendingProposalCount } : {}),
       },
     ]
   })
@@ -95,12 +102,17 @@ function readIdeaTracker(value: unknown): SessionContextRecord["projects"] {
 }
 
 function sumIdeaField(ideas: unknown[], field: "taskCount" | "pendingProposalCount"): number | undefined {
+  const altField = field === "taskCount" ? "tasks" : "proposals"
   let total = 0
   let found = false
   for (const idea of ideas) {
-    if (!isRecord(idea) || typeof idea[field] !== "number") continue
-    total += idea[field]
-    found = true
+    if (!isRecord(idea)) continue
+    const val =
+      typeof idea[field] === "number" ? (idea[field] as number) : typeof idea[altField] === "number" ? (idea[altField] as number) : undefined
+    if (val !== undefined) {
+      total += val
+      found = true
+    }
   }
   return found ? total : undefined
 }

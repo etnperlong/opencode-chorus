@@ -121,6 +121,7 @@ export type OpenCodeState = {
   workers: Record<string, WorkerRecord>
   reviews: Record<string, ReviewRecord>
   sessionContext?: SessionContextRecord
+  chorusReadiness?: ChorusReadinessRecord
   lazyBridge?: LazyBridgeStatusRecord
   notificationRuntime?: NotificationRuntimeRecord
   notificationQueue: QueuedNotification[]
@@ -128,6 +129,15 @@ export type OpenCodeState = {
     lastUnreadBackfillAt?: string
     lastSharedSyncAt?: string
   }
+}
+
+export type ChorusReadinessRecord = {
+  sessionId: string
+  status: "ready" | "error"
+  agentName?: string
+  openSpecAvailable?: boolean
+  lastReadyAt?: string
+  lastError?: string
 }
 
 export type LazyBridgeStatusRecord = {

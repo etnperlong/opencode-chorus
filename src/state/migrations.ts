@@ -1,9 +1,9 @@
 import type { ProjectStateMetadata } from "./paths"
-import type { OpenCodeState, SharedState } from "./state-types"
+import type { ChorusReadinessRecord, OpenCodeState, SharedState } from "./state-types"
 
 export type RuntimeOpenCodeState = Pick<
   OpenCodeState,
-  "mainSession" | "planningScopes" | "workers" | "sessionContext" | "lazyBridge" | "notificationRuntime" | "checkpoints"
+  "mainSession" | "planningScopes" | "workers" | "sessionContext" | "chorusReadiness" | "lazyBridge" | "notificationRuntime" | "checkpoints"
 >
 
 export type PersistedOpenCodeState = Pick<
@@ -72,6 +72,7 @@ export function extractRuntimeOpenCodeState(state: OpenCodeState): RuntimeOpenCo
     planningScopes: isRecord(state.planningScopes) ? state.planningScopes : {},
     workers: isRecord(state.workers) ? state.workers : {},
     sessionContext: isSessionContextRecord(state.sessionContext) ? state.sessionContext : undefined,
+    chorusReadiness: isChorusReadinessRecord(state.chorusReadiness) ? sanitizeChorusReadiness(state.chorusReadiness) : undefined,
     lazyBridge: isLazyBridgeStatusRecord(state.lazyBridge) ? sanitizeLazyBridgeStatus(state.lazyBridge) : undefined,
     notificationRuntime: isNotificationRuntimeRecord(state.notificationRuntime)
       ? sanitizeNotificationRuntime(state.notificationRuntime)
@@ -106,9 +107,23 @@ function persistedChangeShape(state: OpenCodeState) {
 function isMainSessionRecord(value: unknown): value is OpenCodeState["mainSession"] {
   return isRecord(value) && (value.status === "idle" || value.status === "active" || value.status === "closed")
 }
-
 function isLazyBridgeStatusRecord(value: unknown): value is OpenCodeState["lazyBridge"] {
   return isRecord(value) && typeof value.status === "string"
+}
+
+function isChorusReadinessRecord(value: unknown): value is ChorusReadinessRecord {
+  return isRecord(value) && typeof value.sessionId === "string" && (value.status === "ready" || value.status === "error")
+}
+
+function sanitizeChorusReadiness(value: ChorusReadinessRecord): ChorusReadinessRecord {
+  return {
+    sessionId: value.sessionId,
+    status: value.status,
+    ...(typeof value.agentName === "string" ? { agentName: value.agentName } : {}),
+    ...(typeof value.openSpecAvailable === "boolean" ? { openSpecAvailable: value.openSpecAvailable } : {}),
+    ...(typeof value.lastReadyAt === "string" ? { lastReadyAt: value.lastReadyAt } : {}),
+    ...(typeof value.lastError === "string" ? { lastError: value.lastError } : {}),
+  }
 }
 
 function sanitizeLazyBridgeStatus(value: OpenCodeState["lazyBridge"]): OpenCodeState["lazyBridge"] {

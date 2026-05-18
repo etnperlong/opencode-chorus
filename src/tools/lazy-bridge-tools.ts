@@ -20,6 +20,9 @@ type ChorusLazyBridgeClient = {
   callTool<T>(name: string, args?: Record<string, unknown>, scope?: ChorusToolScope): Promise<T>
 }
 
+const CHORUS_ALLOWED_AGENTS = new Set(["chorus", "proposal-reviewer", "task-reviewer"])
+const CHORUS_SILENT_AGENTS = new Set(["proposal-reviewer", "task-reviewer"])
+
 type CreateChorusLazyBridgeToolsOptions = {
   chorusClient: ChorusLazyBridgeClient
   stateStore?: {
@@ -32,6 +35,10 @@ type CreateChorusLazyBridgeToolsOptions = {
   chorusUrl?: string
   /** Chorus-managed staging directory; paths inside it are accepted alongside workspace paths. */
   stagingDir?: string
+  /** Readiness coordinator for on-demand silent initialization by reviewer agents. */
+  readiness?: {
+    ensureReady(sessionId: string, mode: "visible" | "silent"): Promise<void>
+  }
 }
 
 type ToolSearchResult = {
@@ -158,11 +165,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
         toolCount: toolIndex.length,
         lastRefreshSucceededAt: new Date().toISOString(),
       })
-      await showLazyBridgeToast(options, {
-        title: "Chorus tools connected",
-        message: `${toolIndex.length} tools available`,
-        variant: "success",
-      })
       return toolIndex
     } catch (error) {
       await recordLazyBridgeStatus(options, {
@@ -170,11 +172,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
         toolCount: toolIndex?.length,
         lastRefreshFailedAt: new Date().toISOString(),
         lastError: error instanceof Error ? error.message : String(error),
-      })
-      await showLazyBridgeToast(options, {
-        title: toolIndex ? "Chorus tools stale" : "Chorus tools unavailable",
-        message: toolIndex ? "Using cached Chorus tools" : "Refresh failed; check Chorus configuration",
-        variant: toolIndex ? "warning" : "error",
       })
       if (toolIndex) return toolIndex
       throw error
@@ -185,7 +182,9 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
     chorus_tools: tool({
       description: "List all available Chorus tools before inspecting or executing one.",
       args: {},
-      async execute() {
+      async execute(_args, ctx) {
+        enforceAgentAllowList(ctx.agent)
+        await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         return formatToolResult(listTools(index))
       },
@@ -196,7 +195,9 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
       args: {
         toolName: tool.schema.string().describe("Exact Chorus tool name from chorus_tools, for example: `chorus_get_task`"),
       },
-      async execute(args) {
+      async execute(args, ctx) {
+        enforceAgentAllowList(ctx.agent)
+        await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         const target = index.find((item) => item.name === args.toolName)
         if (!target) throw createToolNotFoundError(args.toolName)
@@ -214,6 +215,8 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
           .describe("Arguments for the Chorus tool"),
       },
       async execute(args, ctx) {
+        enforceAgentAllowList(ctx.agent)
+        await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         const toolName = args.toolName
         const target = index.find((item) => item.name === toolName)
@@ -234,11 +237,22 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
   return { tools, refresh }
 }
 
-async function showLazyBridgeToast(
+function enforceAgentAllowList(agent: string): void {
+  if (!CHORUS_ALLOWED_AGENTS.has(agent)) {
+    throw new Error(
+      `Chorus bridge tools are only available to the chorus, proposal-reviewer, and task-reviewer agents. Current agent: ${agent}`,
+    )
+  }
+}
+
+async function triggerSilentReadinessIfNeeded(
+  agent: string,
+  sessionId: string,
   options: CreateChorusLazyBridgeToolsOptions,
-  input: { title: string; message: string; variant: "info" | "success" | "warning" | "error" },
 ): Promise<void> {
-  await options.tui?.showToast({ ...input, duration: 4000 }).catch(() => {})
+  if (CHORUS_SILENT_AGENTS.has(agent) && options.readiness) {
+    await options.readiness.ensureReady(sessionId, "silent")
+  }
 }
 
 export function createChorusLazyBridgeTools(options: CreateChorusLazyBridgeToolsOptions): Record<string, ToolDefinition> {

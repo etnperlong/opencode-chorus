@@ -7,6 +7,7 @@ import { createPluginEventHook } from "./hooks/plugin-event-hook"
 import { createPermissionAskHook } from "./hooks/permission-ask-hook"
 import { createSystemTransformHook } from "./hooks/system-transform-hook"
 import { createToolExecuteAfterHook } from "./hooks/tool-execute-after-hook"
+import { ChorusReadiness } from "./lifecycle/chorus-readiness"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { SessionLifecycle } from "./lifecycle/session-lifecycle"
 import { NotificationCoordinator } from "./notifications/notification-coordinator"
@@ -41,20 +42,38 @@ export const createPlugin: Plugin = async (ctx, options) => {
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
   })
+  // Forward reference so lazyBridge and readiness can reference each other.
+  // readiness is assigned below before either is ever called at runtime.
+  const readinessRef: { current: ChorusReadiness | null } = { current: null }
   const lazyBridge = createChorusLazyBridge({
     chorusClient,
     stateStore,
-    tui: ctx.client.tui
-      ? {
-          showToast: async (input) => {
-            await ctx.client.tui.showToast({ body: { ...input, message: input.message ?? "", variant: input.variant ?? "info" } })
-          },
-        }
-      : undefined,
     chorusUrl: config.chorusUrl,
     stagingDir: stateStore.paths.stagingDir,
+    readiness: {
+      ensureReady: (sessionId, mode) => readinessRef.current?.ensureReady(sessionId, mode) ?? Promise.resolve(),
+    },
   })
   const sessionLifecycle = new SessionLifecycle(stateStore, chorusClient, config.chorusUrl)
+  const tui = ctx.client.tui
+    ? {
+        showToast: async (input: { title?: string; message?: string; variant?: "info" | "success" | "warning" | "error"; duration?: number }) => {
+          await ctx.client.tui.showToast({ body: { ...input, message: input.message ?? "", variant: input.variant ?? "info" } })
+        },
+      }
+    : undefined
+  readinessRef.current = new ChorusReadiness({
+    sessionLifecycle,
+    chorusClient,
+    stateStore,
+    lazyBridge,
+    tui,
+    directory: ctx.directory,
+    enableSessionContextSummary: config.enableSessionContextSummary,
+    logger,
+    stagingDir: stateStore.paths.stagingDir,
+  })
+  const readiness = readinessRef.current
   const planningLifecycle = new PlanningLifecycle(stateStore)
   const notificationCoordinator = new NotificationCoordinator({
     chorusUrl: config.chorusUrl,
@@ -69,19 +88,17 @@ export const createPlugin: Plugin = async (ctx, options) => {
   })
   const eventHook = createPluginEventHook({
     autoStart: config.autoStart,
-    enableSessionContextSummary: config.enableSessionContextSummary,
     stateStore,
     sessionLifecycle,
     logger,
-    stagingDir: stateStore.paths.stagingDir,
-    onSessionStartup: async () => {
-      await lazyBridge.refresh()
-    },
     onSessionReady: async (sessionId) => {
       await notificationCoordinator.handleSessionReady(sessionId)
     },
     onSessionIdle: async (sessionId) => {
       await notificationCoordinator.handleSessionIdle(sessionId)
+    },
+    onSessionEnded: async (sessionId) => {
+      readiness.markSessionEnded(sessionId)
     },
   })
   const toolExecuteAfterHook = createToolExecuteAfterHook({
@@ -124,6 +141,15 @@ export const createPlugin: Plugin = async (ctx, options) => {
     "permission.ask": permissionAskHook,
     "tool.execute.after": toolExecuteAfterHook,
     "experimental.chat.system.transform": systemTransformHook,
+    "chat.params": async ({ sessionID, agent }) => {
+      if (agent === "chorus") {
+        await readiness.ensureReady(sessionID, "visible").catch(async (error) => {
+          await logger.warn("Chorus readiness failed on first chorus agent turn", {
+            error: error instanceof Error ? error.message : String(error),
+          })
+        })
+      }
+    },
     tool: lazyBridge.tools,
   }
 }

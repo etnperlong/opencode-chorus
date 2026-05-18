@@ -1,5 +1,5 @@
 import { markInterruptedReviews } from "../lifecycle/reviewer-lifecycle"
-import { extractSessionEventId, shouldReplaceMainSessionOnStartup, shouldStartMainSession } from "../lifecycle/session-events"
+import { extractSessionEventId, shouldReplaceMainSessionOnStartup } from "../lifecycle/session-events"
 import type { SessionLifecycle } from "../lifecycle/session-lifecycle"
 import { cleanupOrphanWorkers } from "../lifecycle/worker-lifecycle"
 import type { StateStore } from "../state/state-store"
@@ -14,14 +14,12 @@ type PluginEventPayload = {
 
 type CreatePluginEventHookOptions = {
   autoStart: boolean
-  enableSessionContextSummary: boolean
   stateStore: StateStore
   sessionLifecycle: SessionLifecycle
   logger: Pick<Logger, "debug" | "info" | "warn">
-  stagingDir?: string
-  onSessionStartup?: () => Promise<void>
   onSessionReady?: (sessionId: string) => Promise<void>
   onSessionIdle?: (sessionId: string) => Promise<void>
+  onSessionEnded?: (sessionId: string) => Promise<void>
 }
 
 export function createPluginEventHook(options: CreatePluginEventHookOptions) {
@@ -34,28 +32,9 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
       const sessionId = extractSessionEventId(event)
       if (sessionId) {
         const state = await options.stateStore.readOpenCodeState()
-        const replaceExisting = shouldReplaceMainSessionOnStartup(
-          state.mainSession,
-          sessionId,
-          hasHandledSessionStartup,
-        )
-        if (
-          options.autoStart &&
-          (replaceExisting || shouldStartMainSession(state.mainSession.runtimeSessionId, sessionId))
-        ) {
+        if (shouldReplaceMainSessionOnStartup(state.mainSession, sessionId, hasHandledSessionStartup) || options.autoStart) {
           await cleanupOrphanWorkers(options.stateStore)
           await markInterruptedReviews(options.stateStore)
-          await options.sessionLifecycle.start(sessionId, { replaceExisting })
-          if (options.enableSessionContextSummary) {
-            await options.sessionLifecycle.surfaceContextSummary(sessionId, options.logger, options.stagingDir)
-          }
-          try {
-            await options.onSessionStartup?.()
-          } catch (error) {
-            await options.logger.warn("Failed to refresh Chorus lazy bridge on session startup", {
-              error: error instanceof Error ? error.message : String(error),
-            })
-          }
         }
         await options.onSessionReady?.(sessionId)
         hasHandledSessionStartup = true
@@ -72,7 +51,10 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
 
     if (event.type === "session.deleted") {
       const sessionId = extractSessionEventId(event)
-      if (sessionId) await options.sessionLifecycle.stop(sessionId)
+      if (sessionId) {
+        await options.sessionLifecycle.stop(sessionId)
+        await options.onSessionEnded?.(sessionId)
+      }
     }
   }
 }

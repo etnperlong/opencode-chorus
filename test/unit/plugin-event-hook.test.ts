@@ -9,19 +9,14 @@ describe("plugin event hook", () => {
   it("routes session.idle events to session heartbeat", async () => {
     const heartbeatCalls: string[] = []
     const stopCalls: string[] = []
-    const startCalls: Array<{ sessionId: string; replaceExisting: boolean }> = []
     const idleCallbacks: string[] = []
 
     const hook = createPluginEventHook({
       autoStart: true,
-      enableSessionContextSummary: false,
       stateStore: {
         readOpenCodeState: async () => ({ mainSession: { status: "idle", runtimeSessionId: "main" } }),
       } as never,
       sessionLifecycle: {
-        start: async (sessionId: string, options: { replaceExisting: boolean }) => {
-          startCalls.push({ sessionId, replaceExisting: options.replaceExisting })
-        },
         heartbeat: async (sessionId: string) => {
           heartbeatCalls.push(sessionId)
         },
@@ -40,7 +35,6 @@ describe("plugin event hook", () => {
     expect(heartbeatCalls).toEqual(["runtime-1"])
     expect(idleCallbacks).toEqual(["runtime-1"])
     expect(stopCalls).toEqual([])
-    expect(startCalls).toEqual([])
   })
 
   it("marks interrupted reviewer sessions clearly on next startup", async () => {
@@ -61,10 +55,8 @@ describe("plugin event hook", () => {
 
     const hook = createPluginEventHook({
       autoStart: true,
-      enableSessionContextSummary: false,
       stateStore: store,
       sessionLifecycle: {
-        start: async () => {},
         heartbeat: async () => {},
         stop: async () => {},
       } as never,
@@ -82,23 +74,43 @@ describe("plugin event hook", () => {
     })
   })
 
-  it("uses the first session.updated event as a startup fallback once", async () => {
+  it("does NOT call checkin or bridge refresh on session.created — readiness is deferred", async () => {
     const store = await createStore()
-    const startCalls: Array<{ sessionId: string; replaceExisting: boolean }> = []
-    const surfacedSessions: string[] = []
-    const readySessions: string[] = []
+    const checkinCalls: string[] = []
+    const readyCalls: string[] = []
 
     const hook = createPluginEventHook({
       autoStart: true,
-      enableSessionContextSummary: true,
       stateStore: store,
       sessionLifecycle: {
-        start: async (sessionId: string, options: { replaceExisting: boolean }) => {
-          startCalls.push({ sessionId, replaceExisting: options.replaceExisting })
+        // start should NOT be called from the event hook anymore
+        start: async (sessionId: string) => {
+          checkinCalls.push(sessionId)
         },
-        surfaceContextSummary: async (sessionId: string) => {
-          surfacedSessions.push(sessionId)
-        },
+        heartbeat: async () => {},
+        stop: async () => {},
+      } as never,
+      logger: { debug: async () => {}, info: async () => {}, warn: async () => {} },
+      onSessionReady: async (sessionId: string) => {
+        readyCalls.push(sessionId)
+      },
+    })
+
+    await hook({ event: { type: "session.created", properties: { info: { id: "runtime-deferred" } } } })
+
+    expect(checkinCalls).toEqual([])
+    expect(readyCalls).toEqual(["runtime-deferred"])
+  })
+
+  it("uses the first session.updated event as a startup fallback once", async () => {
+    const store = await createStore()
+    const readySessions: string[] = []
+    const endedSessions: string[] = []
+
+    const hook = createPluginEventHook({
+      autoStart: true,
+      stateStore: store,
+      sessionLifecycle: {
         heartbeat: async () => {},
         stop: async () => {},
       } as never,
@@ -106,14 +118,19 @@ describe("plugin event hook", () => {
       onSessionReady: async (sessionId: string) => {
         readySessions.push(sessionId)
       },
+      onSessionEnded: async (sessionId: string) => {
+        endedSessions.push(sessionId)
+      },
     })
 
     await hook({ event: { type: "session.updated", properties: { info: { id: "runtime-updated" } } } })
     await hook({ event: { type: "session.updated", properties: { info: { id: "runtime-updated" } } } })
 
-    expect(startCalls).toEqual([{ sessionId: "runtime-updated", replaceExisting: false }])
-    expect(surfacedSessions).toEqual(["runtime-updated"])
+    // onSessionReady called exactly once (first session.updated only)
     expect(readySessions).toEqual(["runtime-updated"])
+    // session deletion triggers onSessionEnded
+    await hook({ event: { type: "session.deleted", properties: { info: { id: "runtime-updated" } } } })
+    expect(endedSessions).toEqual(["runtime-updated"])
   })
 })
 

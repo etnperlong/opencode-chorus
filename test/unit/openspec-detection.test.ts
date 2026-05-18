@@ -35,6 +35,20 @@ describe("OpenSpec detection", () => {
     }
   })
 
+  it("requires exit code 0 — a non-zero exit is treated as unavailable", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-openspec-"))
+    const cliPath = join(rootDir, "openspec-fail")
+
+    try {
+      await writeFile(cliPath, "#!/usr/bin/env sh\nexit 1\n", "utf8")
+      await chmod(cliPath, 0o755)
+
+      expect(await isOpenSpecCliAvailable({ command: cliPath, timeoutMs: 1_000 })).toBe(false)
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
   it("requires both directory and CLI for availability", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-openspec-"))
 

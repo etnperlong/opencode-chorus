@@ -10,7 +10,7 @@ describe("Chorus lazy bridge tools", () => {
       chorusClient: createClient(),
     })
 
-    const result = await tools.chorus_tools!.execute({}, createToolContext())
+    const result = await tools.chorus_tools!.execute({}, createToolContext("chorus"))
 
     expect(readOutput(result)).toContain('"total": 3')
     expect(readOutput(result)).toContain('"name": "chorus_update_task"')
@@ -18,12 +18,87 @@ describe("Chorus lazy bridge tools", () => {
     expect(readOutput(result)).toContain("Update a task")
   })
 
+  it("rejects bridge tool calls from non-Chorus agents", async () => {
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+    })
+
+    await expect(tools.chorus_tools!.execute({}, createToolContext("build"))).rejects.toThrow(
+      "Chorus bridge tools are only available to the chorus, proposal-reviewer, and task-reviewer agents. Current agent: build",
+    )
+    await expect(tools.chorus_tool_get!.execute({ toolName: "chorus_get_task" }, createToolContext("other-agent"))).rejects.toThrow(
+      /only available to the chorus/,
+    )
+    await expect(tools.chorus_tool_execute!.execute({ toolName: "chorus_get_task" }, createToolContext("general"))).rejects.toThrow(
+      /only available to the chorus/,
+    )
+  })
+
+  it("allows chorus, proposal-reviewer, and task-reviewer agents to use bridge tools", async () => {
+    const tools = createChorusLazyBridgeTools({ chorusClient: createClient() })
+
+    await expect(tools.chorus_tools!.execute({}, createToolContext("chorus"))).resolves.toBeDefined()
+    await expect(tools.chorus_tools!.execute({}, createToolContext("proposal-reviewer"))).resolves.toBeDefined()
+    await expect(tools.chorus_tools!.execute({}, createToolContext("task-reviewer"))).resolves.toBeDefined()
+  })
+
+  it("triggers silent readiness for proposal-reviewer before bridge access", async () => {
+    const readinessCalls: Array<{ sessionId: string; mode: string }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+      readiness: {
+        ensureReady: async (sessionId, mode) => {
+          readinessCalls.push({ sessionId, mode })
+        },
+      },
+    })
+
+    await tools.chorus_tools!.execute({}, createToolContext("proposal-reviewer", "reviewer-session"))
+
+    expect(readinessCalls).toEqual([{ sessionId: "reviewer-session", mode: "silent" }])
+  })
+
+  it("triggers silent readiness for task-reviewer before bridge access", async () => {
+    const readinessCalls: Array<{ sessionId: string; mode: string }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+      readiness: {
+        ensureReady: async (sessionId, mode) => {
+          readinessCalls.push({ sessionId, mode })
+        },
+      },
+    })
+
+    await tools.chorus_tool_execute!.execute(
+      { toolName: "chorus_get_task", arguments: { taskUuid: "t-1" } },
+      createToolContext("task-reviewer", "reviewer-session"),
+    )
+
+    expect(readinessCalls).toEqual([{ sessionId: "reviewer-session", mode: "silent" }])
+  })
+
+  it("does NOT trigger readiness for chorus agent (handled via chat.params hook)", async () => {
+    const readinessCalls: string[] = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+      readiness: {
+        ensureReady: async (sessionId) => {
+          readinessCalls.push(sessionId)
+        },
+      },
+    })
+
+    await tools.chorus_tools!.execute({}, createToolContext("chorus"))
+
+    expect(readinessCalls).toEqual([])
+  })
+
   it("gets Chorus tool details by raw Chorus tool name", async () => {
     const tools = createChorusLazyBridgeTools({
       chorusClient: createClient(),
     })
 
-    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_get_task" }, createToolContext())
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_get_task" }, createToolContext("chorus"))
 
     expect(readOutput(result)).toContain("chorus_get_task")
     expect(readOutput(result)).toContain("taskUuid")
@@ -35,7 +110,7 @@ describe("Chorus lazy bridge tools", () => {
       chorusClient: createClient(),
     })
 
-    await expect(tools.chorus_tool_get!.execute({ toolName: "write a task update tool" }, createToolContext())).rejects.toThrow(
+    await expect(tools.chorus_tool_get!.execute({ toolName: "write a task update tool" }, createToolContext("chorus"))).rejects.toThrow(
       'Tool "write a task update tool" not found. Call \`chorus_tools\` first to list available tools.',
     )
   })
@@ -54,7 +129,7 @@ describe("Chorus lazy bridge tools", () => {
       chorusUrl: "http://localhost:8637",
     })
 
-    await tools.chorus_tools!.execute({}, createToolContext())
+    await tools.chorus_tools!.execute({}, createToolContext("chorus"))
 
     expect(stateUpdates.at(-1)).toEqual({
       lazyBridge: expect.objectContaining({
@@ -96,7 +171,7 @@ describe("Chorus lazy bridge tools", () => {
     expect(JSON.stringify(currentState.lazyBridge)).not.toContain("lastRefreshFailedAt")
   })
 
-  it("shows a success toast when the lazy bridge tool index refreshes", async () => {
+  it("does NOT show a toast when the lazy bridge tool index refreshes — toasts come from readiness coordinator", async () => {
     const toasts: Array<{ title?: string; message?: string; variant?: string }> = []
     const bridge = createChorusLazyBridge({
       chorusClient: createClient(),
@@ -109,16 +184,10 @@ describe("Chorus lazy bridge tools", () => {
 
     await bridge.refresh()
 
-    expect(toasts).toContainEqual(
-      expect.objectContaining({
-        title: "Chorus tools connected",
-        message: "3 tools available",
-        variant: "success",
-      }),
-    )
+    expect(toasts).toHaveLength(0)
   })
 
-  it("shows an error toast without leaking secrets when the lazy bridge cannot refresh", async () => {
+  it("does NOT show an error toast when the lazy bridge refresh fails — errors surface from readiness coordinator", async () => {
     const toasts: Array<{ title?: string; message?: string; variant?: string }> = []
     const bridge = createChorusLazyBridge({
       chorusClient: {
@@ -138,13 +207,7 @@ describe("Chorus lazy bridge tools", () => {
 
     await expect(bridge.refresh()).rejects.toThrow("api-key-secret")
 
-    expect(toasts).toContainEqual(
-      expect.objectContaining({
-        title: "Chorus tools unavailable",
-        variant: "error",
-      }),
-    )
-    expect(JSON.stringify(toasts)).not.toContain("api-key-secret")
+    expect(toasts).toHaveLength(0)
   })
 
   it("executes a real Chorus tool through the bridge", async () => {
@@ -158,7 +221,7 @@ describe("Chorus lazy bridge tools", () => {
         toolName: "chorus_get_task",
         arguments: { taskUuid: "task-1" },
       },
-      createToolContext(),
+      createToolContext("chorus"),
     )
 
     expect(calls).toEqual([{ name: "chorus_get_task", args: { taskUuid: "task-1" } }])
@@ -170,7 +233,7 @@ describe("Chorus lazy bridge tools", () => {
       chorusClient: createClient(),
     })
 
-    await expect(tools.chorus_tool_execute!.execute({ toolName: "get_task", arguments: { taskUuid: "task-1" } }, createToolContext())).rejects.toThrow(
+    await expect(tools.chorus_tool_execute!.execute({ toolName: "get_task", arguments: { taskUuid: "task-1" } }, createToolContext("chorus"))).rejects.toThrow(
       'Tool "get_task" not found. Call `chorus_tools` first to list available tools.',
     )
   })
@@ -206,7 +269,7 @@ describe("Chorus lazy bridge tools", () => {
         toolName: "chorus_get_task",
         arguments: { taskUuid: "task-1" },
       },
-      createToolContext(),
+      createToolContext("chorus"),
     )
 
     expect(calls[0]).toEqual({
@@ -232,7 +295,7 @@ describe("Chorus lazy bridge tools", () => {
           description: "",
         },
       },
-      createToolContext(),
+      createToolContext("chorus"),
     )
 
     expect(calls[0]).toEqual({
@@ -256,7 +319,7 @@ describe("Chorus lazy bridge tools", () => {
           content: "",
         },
       },
-      createToolContext(),
+      createToolContext("chorus"),
     )
 
     expect(calls[0]).toEqual({
@@ -270,7 +333,7 @@ describe("Chorus lazy bridge tools", () => {
       chorusClient: createClient(),
     })
 
-    await expect(tools.chorus_tool_execute!.execute({ toolName: "missing_tool", arguments: {} }, createToolContext())).rejects.toThrow(
+    await expect(tools.chorus_tool_execute!.execute({ toolName: "missing_tool", arguments: {} }, createToolContext("chorus"))).rejects.toThrow(
       'Tool "missing_tool" not found. Call `chorus_tools` first to list available tools.',
     )
   })
@@ -280,7 +343,7 @@ describe("managed document tool schema overlay", () => {
   it("hides content and exposes required contentPath for chorus_pm_add_document_draft", async () => {
     const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
 
-    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_add_document_draft" }, createToolContext())
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_add_document_draft" }, createToolContext("chorus"))
     const output = readOutput(result)
 
     expect(output).toContain("contentPath")
@@ -292,7 +355,7 @@ describe("managed document tool schema overlay", () => {
   it("hides content and exposes optional contentPath for chorus_pm_update_document_draft", async () => {
     const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
 
-    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_update_document_draft" }, createToolContext())
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_update_document_draft" }, createToolContext("chorus"))
     const output = JSON.parse(readOutput(result))
 
     expect(output.optionalFields).toContain("contentPath")
@@ -304,7 +367,7 @@ describe("managed document tool schema overlay", () => {
   it("hides content and exposes optional contentPath for chorus_pm_create_document", async () => {
     const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
 
-    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_create_document" }, createToolContext())
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_create_document" }, createToolContext("chorus"))
     const output = JSON.parse(readOutput(result))
 
     expect(output.optionalFields).toContain("contentPath")
@@ -315,7 +378,7 @@ describe("managed document tool schema overlay", () => {
   it("hides content and exposes optional contentPath for chorus_pm_update_document", async () => {
     const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
 
-    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_update_document" }, createToolContext())
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_pm_update_document" }, createToolContext("chorus"))
     const output = JSON.parse(readOutput(result))
 
     expect(output.optionalFields).toContain("contentPath")
@@ -325,7 +388,7 @@ describe("managed document tool schema overlay", () => {
   it("does not overlay non-document tools like chorus_update_task", async () => {
     const tools = createChorusLazyBridgeTools({ chorusClient: createClientWithDocumentTools() })
 
-    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_update_task" }, createToolContext())
+    const result = await tools.chorus_tool_get!.execute({ toolName: "chorus_update_task" }, createToolContext("chorus"))
     const output = readOutput(result)
 
     expect(output).not.toContain("contentPath")
@@ -346,8 +409,7 @@ describe("managed document tool execute-time rewrite", () => {
         toolName: "chorus_pm_add_document_draft",
         arguments: { proposalUuid: "p-1", type: "prd", title: "My PRD", contentPath: filePath },
       },
-      createToolContext(dir),
-    )
+      createToolContext("chorus", "session-1", dir)    )
 
     expect(calls[0]!.args.content).toBe("# My PRD\n\nSome content.")
     expect(calls[0]!.args.contentPath).toBeUndefined()
@@ -366,8 +428,7 @@ describe("managed document tool execute-time rewrite", () => {
         toolName: "chorus_pm_add_document_draft",
         arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "docs/prd.md" },
       },
-      createToolContext(dir),
-    )
+      createToolContext("chorus", "session-1", dir)    )
 
     expect(calls[0]!.args.content).toBe("# PRD")
     expect(calls[0]!.args.contentPath).toBeUndefined()
@@ -382,7 +443,7 @@ describe("managed document tool execute-time rewrite", () => {
         toolName: "chorus_pm_update_document_draft",
         arguments: { proposalUuid: "p-1", draftUuid: "d-1", title: "New Title" },
       },
-      createToolContext(),
+      createToolContext("chorus"),
     )
 
     expect(calls[0]!.args).toEqual({ proposalUuid: "p-1", draftUuid: "d-1", title: "New Title" })
@@ -397,7 +458,7 @@ describe("managed document tool execute-time rewrite", () => {
         toolName: "chorus_update_task",
         arguments: { taskUuid: "t-1", status: "in_progress" },
       },
-      createToolContext(),
+      createToolContext("chorus"),
     )
 
     expect(calls[0]!.args).toEqual({ taskUuid: "t-1", status: "in_progress" })
@@ -414,7 +475,7 @@ describe("managed document tool path-only validation", () => {
           toolName: "chorus_pm_add_document_draft",
           arguments: { proposalUuid: "p-1", type: "prd", title: "T", content: "inline body" },
         },
-        createToolContext(),
+        createToolContext("chorus"),
       ),
     ).rejects.toThrow("requires `contentPath`")
   })
@@ -429,7 +490,7 @@ describe("managed document tool path-only validation", () => {
           toolName: "chorus_pm_add_document_draft",
           arguments: { content: "inline body" },
         },
-        createToolContext(),
+        createToolContext("chorus"),
       ),
     ).rejects.toThrow()
 
@@ -445,7 +506,7 @@ describe("managed document tool path-only validation", () => {
           toolName: "chorus_pm_add_document_draft",
           arguments: { proposalUuid: "p-1", type: "prd", title: "T" },
         },
-        createToolContext(),
+        createToolContext("chorus"),
       ),
     ).rejects.toThrow(/requires.*contentPath/)
   })
@@ -460,8 +521,7 @@ describe("managed document tool path-only validation", () => {
           toolName: "chorus_pm_add_document_draft",
           arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "no-such-file.md" },
         },
-        createToolContext(dir),
-      ),
+        createToolContext("chorus", "session-1", dir)      ),
     ).rejects.toThrow(/file not found/)
   })
 
@@ -476,8 +536,7 @@ describe("managed document tool path-only validation", () => {
           toolName: "chorus_pm_add_document_draft",
           arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "docs" },
         },
-        createToolContext(dir),
-      ),
+        createToolContext("chorus", "session-1", dir)      ),
     ).rejects.toThrow(/directory/)
   })
 
@@ -491,8 +550,7 @@ describe("managed document tool path-only validation", () => {
           toolName: "chorus_pm_add_document_draft",
           arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: "../../etc/passwd" },
         },
-        createToolContext(dir),
-      ),
+        createToolContext("chorus", "session-1", dir)      ),
     ).rejects.toThrow(/outside the permitted/)
   })
 
@@ -513,7 +571,7 @@ describe("managed document tool path-only validation", () => {
         toolName: "chorus_pm_add_document_draft",
         arguments: { proposalUuid: "p-1", type: "prd", title: "T", contentPath: stagingFile },
       },
-      createToolContext(workspaceDir),
+      createToolContext("chorus", "session-1", workspaceDir)
     )
 
     expect(calls[0]!.args.content).toBe("# PRD from staging")
@@ -633,11 +691,11 @@ function createToolDefinitions() {
   ]
 }
 
-function createToolContext(directory = "/tmp/project") {
+function createToolContext(agent = "chorus", sessionID = "session-1", directory = "/tmp/project") {
   return {
-    sessionID: "session-1",
+    sessionID,
     messageID: "message-1",
-    agent: "build",
+    agent,
     directory,
     worktree: directory,
     abort: new AbortController().signal,

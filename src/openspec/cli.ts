@@ -28,11 +28,11 @@ export async function isOpenSpecCliAvailable(options: OpenSpecCliOptions = {}): 
       resolve(!isMissingCommandError(error))
     })
 
-    child.once("close", () => {
+    child.once("close", (code) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
-      resolve(true)
+      resolve(code === 0)
     })
   })
 }
