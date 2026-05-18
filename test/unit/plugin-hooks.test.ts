@@ -37,9 +37,18 @@ mock.module("../../src/chorus/mcp-client", () => ({
       toolCalls.push({ name, args })
       if (name === "chorus_checkin") {
         return {
-          session: { uuid: "chorus-session-1" },
-          agent: { uuid: "agent-1", name: "OpenCode", permissions: ["task:read", "task:write"] },
-          projects: [{ uuid: "project-1", name: "OpenCode-Chorus", taskCount: 2, pendingProposalCount: 1 }],
+          agent: {
+            uuid: "agent-1",
+            name: "OpenCode",
+            permissions: { task: ["read", "write"] },
+            owner: { uuid: "user-1", name: "etnperlong" },
+          },
+          ideaTracker: {
+            "project-1": {
+              name: "OpenCode-Chorus",
+              ideas: [{ taskCount: 2, pendingProposalCount: 1 }],
+            },
+          },
           notifications: [{ uuid: "notification-1" }],
         }
       }
@@ -817,7 +826,7 @@ describe("plugin hooks", () => {
       expect(taskReviewer).toBeDefined()
       expect(proposalReviewer).toMatchObject({
         mode: "subagent",
-        maxSteps: 20,
+        maxSteps: 40,
         permission: {
           edit: "deny",
           bash: "deny",
@@ -826,7 +835,7 @@ describe("plugin hooks", () => {
       expect(proposalReviewer?.prompt).toContain("Hard stop rule")
       expect(taskReviewer).toMatchObject({
         mode: "subagent",
-        maxSteps: 25,
+        maxSteps: 50,
         permission: {
           edit: "deny",
           bash: "allow",
