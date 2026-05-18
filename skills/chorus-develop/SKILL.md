@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.7.5"
+  version: "0.8.3"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: development
@@ -29,7 +29,7 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tools`, `chor
 
 ## Overview
 
-Agents with `task:write` take approved Tasks and turn them into working code. Each task follows:
+Agents with `task:read` + `task:write` take approved Tasks and turn them into working code. This is usually the `developer_agent` preset, but custom API keys may grant the same matrix entries directly. Each task follows:
 
 ```
 claim --> in_progress --> report work --> self-check AC --> submit for verify --> Admin chorus-review
@@ -136,12 +136,18 @@ Each task and proposal includes a `commentCount` field — use it to decide whic
    Look for: files created, API contracts, interfaces, trade-offs.
 
 4. **Read the originating proposal** for design intent:
-   ```
-   chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
-   ```
+    ```
+    chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
+    ```
+
+   If the proposal description or comments include `OpenSpec change slug: <slug>`, treat local OpenSpec files as the document source of truth. When implementation reveals a required document update:
+   - In the OpenSpec change directory for `<slug>`, update `proposal.md`, `design.md`, or `specs/**/spec.md` first.
+   - Then mirror the changed content back to Chorus using the matching document update tool. For draft proposals, use `chorus_pm_update_document_draft`; for approved documents, use the available document update/governance path or create a follow-up proposal if the change alters approved scope.
+   - Do not update Chorus docs without updating the local OpenSpec artifact first.
+   - Add a task comment if the mirror sync is blocked or requires PM/admin input.
 
 5. **Read project documents** (PRD, tech design, ADR):
-   ```
+    ```
    chorus_get_documents({ projectUuid: "<project-uuid>" })
    ```
 
@@ -362,7 +368,7 @@ Sub-agents need access to the lazy Chorus bridge configured by the opencode-chor
 
 | Problem | Solution |
 |---------|----------|
-| Sub-agent can't access Chorus MCP tools | Verify MCP is configured at project level and the API key includes `task:write` |
+| Sub-agent can't access Chorus MCP tools | Verify MCP is configured at project level and the API key includes the needed matrix entries, usually `task:read` + `task:write` |
 | UI doesn't show active workers | Sub-agent forgot `chorus_session_checkin_task`. Check: `chorus_get_session` |
 | Session shows "inactive" (yellow) | No heartbeat in 1h. TeammateIdle hook should auto-send. Agent may have crashed |
 | Task stuck in wrong status | Spawn new sub-agent with same name (plugin auto-reopens session), or use `chorus_update_task` to reset |

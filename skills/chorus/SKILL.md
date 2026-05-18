@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.7.5"
+  version: "0.8.3"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: overview
@@ -19,7 +19,7 @@ metadata:
 
 # Chorus Skill
 
-Chorus is a work collaboration platform for AI agents and humans. Access to tools is controlled by fine-grained permissions such as `task:read`, `task:write`, `idea:write`, `proposal:write`, and `task:admin`.
+Chorus is a work collaboration platform for AI agents and humans. Access to tools is controlled by a fine-grained permission matrix such as `task:read`, `task:write`, `idea:write`, `proposal:write`, and `task:admin`.
 
 This is the **core skill** — it covers the platform overview, shared tools, and setup. For stage-specific workflows, use the dedicated skills listed in [Skill Routing](#skill-routing) below.
 
@@ -41,13 +41,33 @@ creates  analyzes     drafts PRD         codes &      reviews   closes
 
 ### Common Permission Gates
 
-| Permission | Responsibility | MCP Tools |
-|------------|----------------|-----------|
-| **`task:read`** | Query Chorus state, inspect assignments, read comments, search, and route to the right workflow | Shared read/query tools |
-| **`idea:write`** | Create or claim ideas, run elaboration, and validate requirement answers | `chorus_pm_*_idea`, elaboration tools |
-| **`proposal:write`** | Create proposals, draft documents, create task drafts, and submit for review | `chorus_pm_*proposal*`, draft tools |
-| **`task:write`** | Claim tasks, update task state, report work, self-check criteria, and submit for verification | `chorus_*_task`, `chorus_report_work` |
-| **`task:admin`** | Approve proposals, verify tasks, reopen work, and handle governance actions | `chorus_admin_*` and review tools |
+Chorus v0.8 uses a 5x3 permission matrix: 5 resources x 3 actions = 15 possible permissions.
+
+| Resource | Meaning |
+|----------|---------|
+| `idea` | Ideas and elaboration workflow |
+| `proposal` | Proposal containers, proposal submission, and proposal lifecycle |
+| `document` | PRDs, tech designs, ADRs, specs, guides, and document drafts |
+| `task` | Task claiming, status updates, work reports, acceptance criteria, and verification |
+| `project` | Project metadata, project groups, dashboards, and project-level administration |
+
+| Action | Meaning |
+|--------|---------|
+| `read` | Query, inspect, list, search, and read comments or context |
+| `write` | Create, claim, update, draft, report, self-check, or submit |
+| `admin` | Approve, verify, reopen, close, revoke, or perform governance actions |
+
+Permission strings use `<resource>:<action>`, for example `task:read`, `task:write`, `proposal:write`, or `task:admin`. `chorus_checkin` returns the permissions granted to the current API key; route yourself by the returned permissions rather than by assumptions.
+
+### Role Presets
+
+The Chorus UI can grant common role presets. Custom API keys may use any subset of the matrix, so always trust `chorus_checkin()` over the preset name.
+
+| Preset | Intended use | Typical permission set |
+|--------|--------------|------------------------|
+| `developer_agent` | Implement approved tasks and report progress | `idea:read`, `proposal:read`, `document:read`, `task:read`, `task:write`, `project:read` |
+| `pm_agent` | Run ideation and proposal planning | `idea:read`, `idea:write`, `proposal:read`, `proposal:write`, `document:read`, `document:write`, `task:read`, `task:write`, `project:read` |
+| `admin_agent` | Full governance, approvals, verification, and project administration | All 15 permissions: `idea:*`, `proposal:*`, `document:*`, `task:*`, `project:*` |
 
 ---
 
@@ -289,13 +309,15 @@ If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode res
 
 ### 4. Permission-Oriented Tool Access
 
-| Permission | Typical access |
-|------------|----------------|
-| `task:read` | `chorus_checkin`, query/list/get tools, comments, notifications, search |
-| `task:write` | task claim/update/report/self-check/submit workflows |
-| `idea:write` | idea creation, claiming, elaboration, validation |
-| `proposal:write` | proposal creation, document drafts, task drafts, submission |
-| `task:admin` | proposal approval, task verification, reopen/close governance actions |
+Use `chorus_checkin()` to inspect your actual matrix. The common tool families map to resources and actions like this:
+
+| Resource | `read` examples | `write` examples | `admin` examples |
+|----------|-----------------|------------------|------------------|
+| `idea` | Get/list ideas, read elaboration state | Create/claim ideas, answer or validate elaboration | Close or govern idea lifecycle |
+| `proposal` | Get/list proposals and comments | Create/update/submit proposals | Approve, reject, revoke, or govern proposals |
+| `document` | Get/list project documents | Create/update document drafts | Govern document lifecycle |
+| `task` | Get/list tasks, assignments, comments | Claim/update/report/self-check/submit tasks | Verify, reopen, close, or govern tasks |
+| `project` | List projects, groups, dashboards, activity | Create/update project metadata where available | Administer project-level governance |
 
 ### 5. Review Agent Configuration
 
@@ -336,7 +358,7 @@ Chorus integrations share lifecycle concepts, but runtime wiring differs. For Op
 1. **Always check in first** — Call `chorus_checkin()` at session start
 2. **Sessions are automatic** — The opencode-chorus plugin creates, heartbeats, and closes sessions. Never call `chorus_create_session` or `chorus_close_session`.
 3. **Session checkin is sub-agent only** — Sub-agents call `chorus_session_checkin_task` / `chorus_session_checkout_task` and pass `sessionUuid`. Main agent skips session tools entirely.
-4. **Stay within your permissions** — Only use tools available to the permissions granted to your API key
+4. **Stay within your permissions** — Use only tools allowed by your `chorus_checkin()` permission matrix; presets are shortcuts, not proof of access
 5. **Report progress** — Use `chorus_report_work` or `chorus_add_comment`
 6. **Follow the lifecycle** — Ideas flow through Proposals to Tasks; don't skip steps
 7. **Set up task dependency DAG** — Use `dependsOnDraftUuids` in task drafts to express execution order
@@ -384,6 +406,7 @@ This is the core overview skill. For stage-specific workflows, use:
 |-------|-------|-------------|
 | **Full Auto** | `chorus-yolo` | Full-auto AI-DLC pipeline — from prompt to done. Automates Idea → Proposal → Execute → Verify with adversarial reviewers |
 | **Quick Dev** | `chorus-quick-dev` | Skip Idea→Proposal, create tasks directly, execute, and verify |
+| **openspec-aware** | `chorus-openspec` | OpenSpec-backed proposal authoring, document mirror sync, and archive reminders |
 | **Ideation** | `chorus-idea` | Claim Ideas, run elaboration rounds, prepare for proposal |
 | **Planning** | `chorus-proposal` | Create Proposals with document & task drafts, manage dependency DAG, submit for review |
 | **Development** | `chorus-develop` | Claim Tasks, report work, session & sub-agent management, OpenCode subagents integration |
@@ -392,8 +415,9 @@ This is the core overview skill. For stage-specific workflows, use:
 ### Getting Started
 
 1. Call `chorus_checkin()` to learn your permissions and assignments
-2. Based on your permissions, use the appropriate skill:
-   - **Full Auto** → `chorus-yolo` — give a prompt, agent handles everything (requires `idea:write`, `proposal:write`, `task:write`, and `task:admin`)
-   - `idea:write` + `proposal:write` → `chorus-idea` then `chorus-proposal`
-   - `task:write` → `chorus-develop`
-   - `task:admin` → `chorus-review`
+2. Based on your role preset or matrix grants, use the appropriate skill:
+   - `developer_agent` or custom grants with `task:read` + `task:write` → `chorus-develop`
+   - `pm_agent` or custom grants with `idea:write` + `proposal:write` + `document:write` → `chorus-idea` then `chorus-proposal`
+   - `admin_agent` or custom grants with `task:admin` / governance permissions → `chorus-review`
+   - **Full Auto** → `chorus-yolo` when the matrix includes planning, development, and verification permissions (`idea:write`, `proposal:write`, `document:write`, `task:write`, and `task:admin`)
+   - Custom minimal API keys → choose the narrowest skill matching the permissions returned by `chorus_checkin()`

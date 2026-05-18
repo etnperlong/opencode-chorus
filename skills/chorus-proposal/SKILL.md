@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.7.5"
+  version: "0.8.3"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: planning
@@ -84,6 +84,8 @@ Elaboration resolved --> Create Proposal --> Add drafts --> Validate --> Submit 
 
 **Recommended approach:** Create the proposal container first without any drafts, then incrementally add document and task drafts one by one.
 
+If the project is known to use OpenSpec, run Step 1.5 first so the proposal description can include `OpenSpec change slug: <slug>`.
+
 ```
 chorus_pm_create_proposal({
   projectUuid: "<project-uuid>",
@@ -95,6 +97,29 @@ chorus_pm_create_proposal({
 ```
 
 **Multiple Ideas:** You can combine multiple ideas into one proposal by passing multiple UUIDs in `inputUuids`.
+
+### Step 1.5: Detect OpenSpec Mode
+
+Before adding document drafts, check whether this repository should use OpenSpec-backed authoring:
+
+1. Confirm the project root contains `openspec/`.
+2. Confirm the `openspec` CLI is available with a harmless command such as `openspec --version`.
+3. If both are true, load the `chorus-openspec` skill and use OpenSpec mode.
+4. If either is false, continue in free-form mode and add document drafts inline in Step 2.
+
+**OpenSpec mode branch:**
+
+- Pick or confirm a change slug.
+- Run `openspec new change <slug>` if the change does not already exist.
+- Author local `proposal.md`, `design.md`, `specs/**/spec.md`, and `tasks.md` under `openspec/changes/<slug>/`.
+- Include `OpenSpec change slug: <slug>` in the Chorus proposal description, or add it as a proposal comment if the proposal was already created.
+- Mirror local OpenSpec documents into Chorus with `chorus_pm_add_document_draft`.
+- Convert `tasks.md` into Chorus task drafts with `chorus_pm_add_task_draft`.
+
+**Free-form mode branch:**
+
+- Continue to Step 2 and write PRD / tech design / spec content directly in `chorus_pm_add_document_draft` calls.
+- Continue to Step 3 and write task drafts directly in Chorus.
 
 ### Step 2: Add Document Drafts
 

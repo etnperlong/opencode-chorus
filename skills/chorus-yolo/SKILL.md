@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.7.5"
+  version: "0.8.3"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: full-auto
@@ -65,12 +65,13 @@ chorus-yolo <prompt>
 
 ## Prerequisites
 
-**This workflow requires multiple permissions on the API key:**
+**This workflow requires multiple permission matrix entries on the API key:**
 
 | Permission | Why |
 |------------|-----|
 | `idea:write` | Idea creation and elaboration |
 | `proposal:write` | Proposal creation and draft management |
+| `document:write` | PRD and tech design draft management |
 | `task:write` | Task claiming, execution, and submission |
 | `task:admin` | Proposal approval and task verification |
 
@@ -82,13 +83,24 @@ Sub-agents share the same API key as the main agent. The plugin injects session 
 result = chorus_checkin()
 permissions = result.agent.permissions ?? {}
 
-required = ["idea:write", "proposal:write", "task:write", "task:admin"]
-missing = required.filter((permission) =>
-  Array.isArray(permissions) ? !permissions.includes(permission) : permissions[permission] !== true,
-)
+hasPermission(resource, action) =
+  Array.isArray(permissions)
+    ? permissions.includes(`${resource}:${action}`)
+    : Array.isArray(permissions[resource])
+      ? permissions[resource].includes(action)
+      : permissions[`${resource}:${action}`] === true
+
+required = [
+  ["idea", "write"],
+  ["proposal", "write"],
+  ["document", "write"],
+  ["task", "write"],
+  ["task", "admin"],
+]
+missing = required.filter(([resource, action]) => !hasPermission(resource, action))
 
 if missing:
-  ABORT: "Cannot run chorus-yolo. Missing required permissions: {missing}. Your API key must include idea:write, proposal:write, task:write, and task:admin."
+  ABORT: "Cannot run chorus-yolo. Missing required permissions: {missing}. Your API key must include idea:write, proposal:write, document:write, task:write, and task:admin."
 ```
 
 ---
@@ -198,18 +210,58 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
 
 #### Step 1.4: Create Proposal
 
-1. **Create empty container:**
+1. **Detect authoring mode:**
+   - If the project root contains `openspec/` and `openspec --version` works, use OpenSpec mode.
+   - Load `chorus-openspec`, pick a kebab-case change slug, and run `openspec new change <slug>` unless the change already exists.
+   - If OpenSpec is unavailable, use free-form mode and add the tech design inline through Chorus document drafts.
+
+2. **Create empty container:**
    ```
    chorus_pm_create_proposal({
      projectUuid: "<project-uuid>",
      title: "<feature name>",
-     description: "<summary of what the proposal covers>",
+     description: "<summary of what the proposal covers>" + (openspecMode ? "\n\nOpenSpec change slug: <slug>" : ""),
      inputType: "idea",
      inputUuids: ["<idea-uuid>"]
    })
    ```
 
-2. **Add tech design document draft:**
+3. **OpenSpec mode: author local files and mirror:**
+   ```bash
+   openspec new change <slug>
+   ```
+
+   Author:
+   - `proposal.md` in the OpenSpec change directory for `<slug>`
+   - `openspec/changes/<slug>/design.md`
+   - `openspec/changes/<slug>/specs/**/spec.md`
+   - `openspec/changes/<slug>/tasks.md`
+
+   Mirror documents to Chorus:
+   ```
+   chorus_pm_add_document_draft({
+     proposalUuid: "<proposal-uuid>",
+     type: "prd",
+     title: "PRD: <feature>",
+     content: "<contents of proposal.md>"
+   })
+   chorus_pm_add_document_draft({
+     proposalUuid: "<proposal-uuid>",
+     type: "tech_design",
+     title: "Tech Design: <feature>",
+     content: "<contents of design.md>"
+   })
+   chorus_pm_add_document_draft({
+     proposalUuid: "<proposal-uuid>",
+     type: "spec",
+     title: "Spec: <capability>",
+     content: "<contents of specs/.../spec.md>"
+   })
+   ```
+
+   Convert `tasks.md` into task drafts using `chorus_pm_add_task_draft`, preserving dependencies.
+
+4. **Free-form mode: add tech design document draft inline:**
    ```
    chorus_pm_add_document_draft({
      proposalUuid: "<proposal-uuid>",
@@ -219,7 +271,7 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    })
    ```
 
-3. **Add task drafts incrementally** (use returned `draftUuid` for dependency chaining):
+5. **Add task drafts incrementally** (use returned `draftUuid` for dependency chaining):
    ```
    # First task
    result1 = chorus_pm_add_task_draft({
@@ -246,13 +298,13 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    })
    ```
 
-4. **Validate:**
+6. **Validate:**
    ```
    chorus_pm_validate_proposal({ proposalUuid: "<proposal-uuid>" })
    ```
    Fix any errors, then proceed.
 
-5. **Submit:**
+7. **Submit:**
    ```
    chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
    ```
@@ -474,7 +526,7 @@ After all waves complete, output a markdown summary:
 - Watch the wave count -- if tasks keep getting reopened, consider Ctrl+C and manually reviewing the feedback
 - All audit trail is preserved: elaboration Q&A, reviewer VERDICTs, work reports. Check Chorus UI for full history
 - For small/simple tasks, consider `chorus-quick-dev` instead -- it skips the Idea->Proposal overhead
-- Sub-agents share your API key; ensure it includes `idea:write`, `proposal:write`, `task:write`, and `task:admin` before starting
+- Sub-agents share your API key; ensure it includes `idea:write`, `proposal:write`, `document:write`, `task:write`, and `task:admin` before starting
 
 ---
 

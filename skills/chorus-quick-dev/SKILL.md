@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.7.5"
+  version: "0.8.3"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: quick-development
@@ -32,7 +32,7 @@ In OpenCode plugin mode, Chorus uses the lazy bridge tools `chorus_tools`, `chor
 The standard AI-DLC flow ensures quality through structured planning, but adds overhead that slows down small tasks. Quick Dev provides a lightweight alternative:
 
 ```
-[check task:admin permission] → chorus_create_tasks → chorus_claim_task → in_progress → report → self-check AC → submit for verify → [self-verify if `task:admin`] → done
+[check permission matrix for `task:admin`] → chorus_create_tasks → chorus_claim_task → in_progress → report → self-check AC → submit for verify → [self-verify if `task:admin`] → done
 ```
 
 **Use Quick Dev when:**
@@ -54,11 +54,11 @@ For complex work, use `chorus-idea` + `chorus-proposal` instead.
 
 ## Pre-Flight: Admin Self-Verify Check
 
-**Before creating tasks**, if your API key includes `task:admin`, ask the user:
+**Before creating tasks**, if `chorus_checkin()` shows `task:admin` in your permission matrix, ask the user:
 
 > "I have admin privileges. After development, should I verify the task myself, or leave it for another admin to verify?"
 
-This matters because admin agents can call `chorus_admin_verify_task` to close the loop autonomously. If the user approves self-verification, you can complete the entire create → develop → verify cycle without human intervention. Record the decision and apply it in Step 7.
+This matters because `admin_agent` presets, or custom keys with `task:admin`, can call `chorus_admin_verify_task` to close the loop autonomously. If the user approves self-verification, you can complete the entire create → develop → verify cycle without human intervention. Record the decision and apply it in Step 7.
 
 ---
 
@@ -168,7 +168,7 @@ chorus_submit_for_verify({
 
 In OpenCode, `chorus_submit_for_verify` auto-launches `task-reviewer` when reviewer gating is enabled and waits for the current VERDICT or timeout before returning. See `chorus-develop` for full reviewer-gate handling.
 
-**Admin self-verification:** If your API key includes `task:admin` and the user approved self-verification in the Pre-Flight check, you can verify the task yourself immediately after submitting:
+**Admin self-verification:** If your permission matrix includes `task:admin` and the user approved self-verification in the Pre-Flight check, you can verify the task yourself immediately after submitting:
 
 ```
 chorus_admin_verify_task({ taskUuid: "<task-uuid>" })

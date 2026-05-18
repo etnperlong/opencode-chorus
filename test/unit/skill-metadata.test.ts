@@ -9,6 +9,7 @@ const expectedSkills = [
   "chorus",
   "chorus-develop",
   "chorus-idea",
+  "chorus-openspec",
   "chorus-proposal",
   "chorus-quick-dev",
   "chorus-review",
@@ -41,6 +42,14 @@ const expectedMetadata: Record<
     tools:
       "chorus_claim_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration",
     sentinels: ["## Tools", "## Workflow", "idea:write", "question"],
+  },
+  "chorus-openspec": {
+    workflow: "openspec-aware",
+    role: "proposal:write",
+    keywords: "openspec,spec-driven,document-drafts,mirror-sync,archive,proposal",
+    tools:
+      "chorus_pm_add_document_draft,chorus_pm_update_document_draft,chorus_pm_add_task_draft,chorus_pm_update_task_draft",
+    sentinels: ["## Detect OpenSpec Mode", "openspec new change", "Mirror Sync To Chorus Drafts"],
   },
   "chorus-proposal": {
     workflow: "planning",
@@ -144,7 +153,7 @@ describe("bundled skill metadata", () => {
       expect(frontmatter.compatibility).toBe("opencode")
       expect(metadata).toEqual({
         author: "chorus",
-        version: "0.7.5",
+        version: "0.8.3",
         category: "project-management",
         mcp_server: "lazy-chorus-bridge",
         workflow: expected.workflow,
@@ -172,6 +181,7 @@ describe("bundled skill metadata", () => {
     expect(chorusSource).toContain('"mcp"')
     expect(chorusSource).toContain('"chorus"')
     expect(chorusSource).toContain("chorus-idea")
+    expect(chorusSource).toContain("chorus-openspec")
     expect(chorusSource).toContain("chorus-yolo")
   })
 })
