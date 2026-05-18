@@ -804,7 +804,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("registers reviewer agents with OpenCode step budgets", async () => {
+  it("registers Chorus and reviewer agents with the expected OpenCode config", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -821,11 +821,22 @@ describe("plugin hooks", () => {
       })
 
       const agents = config.agent as Record<string, Record<string, unknown>>
+      const chorusAgent = agents["chorus"]
       const proposalReviewer = agents["proposal-reviewer"]
       const taskReviewer = agents["task-reviewer"]
 
+      expect(Object.keys(agents)).toEqual(["chorus", "proposal-reviewer", "task-reviewer"])
+      expect(chorusAgent).toBeDefined()
       expect(proposalReviewer).toBeDefined()
       expect(taskReviewer).toBeDefined()
+      expect(chorusAgent).toMatchObject({
+        mode: "all",
+        color: "#8b5cf6",
+        description: "Run Chorus workflows with guided tool usage, skill routing, and lifecycle rules.",
+      })
+      expect(chorusAgent?.prompt).toContain("chorus_tools")
+      expect("maxSteps" in (chorusAgent ?? {})).toBe(false)
+      expect("steps" in (chorusAgent ?? {})).toBe(false)
       expect(proposalReviewer).toMatchObject({
         mode: "subagent",
         maxSteps: 40,

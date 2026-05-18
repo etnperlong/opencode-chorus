@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- Added a bundled `chorus` agent with `mode: "all"`, a dedicated purple identity, and a lean English system prompt covering Chorus tool usage, skill routing, lifecycle status flows, and reviewer-gate behavior.
 - Added `chorus-openspec` bundled skill for OpenSpec-aware proposal authoring, document draft mirroring, document update guidance, and archive reminders.
 - Added TypeScript OpenSpec environment detection helpers for `openspec/` directory and `openspec` CLI availability checks.
 - Added `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` as **path-managed document tools** in the lazy Chorus bridge. Agents pass a `contentPath` file path; the bridge reads the file and injects its content as the real remote `content` field before forwarding the call.
