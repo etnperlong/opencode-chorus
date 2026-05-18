@@ -1,3 +1,5 @@
+import type { ProjectStateMetadata } from "./paths"
+
 export type PlanningScopeRecord = {
   id: string
   status: "open" | "closing" | "closed" | "aborted"
@@ -107,6 +109,7 @@ export type OpenCodeState = {
   version: 1
   runtime: "opencode"
   updatedAt: string
+  project?: ProjectStateMetadata
   mainSession: {
     runtimeSessionId?: string
     chorusSessionUuid?: string

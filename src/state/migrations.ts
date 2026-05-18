@@ -1,16 +1,34 @@
+import type { ProjectStateMetadata } from "./paths"
 import type { OpenCodeState, SharedState } from "./state-types"
 
-export function createDefaultOpenCodeState(): OpenCodeState {
+export type RuntimeOpenCodeState = Pick<
+  OpenCodeState,
+  "mainSession" | "planningScopes" | "workers" | "sessionContext" | "lazyBridge" | "notificationRuntime" | "checkpoints"
+>
+
+export type PersistedOpenCodeState = Pick<
+  OpenCodeState,
+  "version" | "runtime" | "updatedAt" | "project" | "reviews" | "notificationQueue"
+>
+
+export function createDefaultRuntimeState(): RuntimeOpenCodeState {
+  return {
+    mainSession: { status: "idle" },
+    planningScopes: {},
+    workers: {},
+    checkpoints: {},
+  }
+}
+
+export function createDefaultOpenCodeState(project?: ProjectStateMetadata): OpenCodeState {
   return {
     version: 1,
     runtime: "opencode",
     updatedAt: new Date().toISOString(),
-    mainSession: { status: "idle" },
-    planningScopes: {},
-    workers: {},
+    ...(project ? { project } : {}),
+    ...createDefaultRuntimeState(),
     reviews: {},
     notificationQueue: [],
-    checkpoints: {},
   }
 }
 
@@ -22,30 +40,71 @@ export function createDefaultSharedState(): SharedState {
   }
 }
 
-export function migrateOpenCodeState(input: unknown): OpenCodeState {
-  if (!input || typeof input !== "object") return createDefaultOpenCodeState()
+export function migrateOpenCodeState(input: unknown, project?: ProjectStateMetadata): OpenCodeState {
+  if (!input || typeof input !== "object") return createDefaultOpenCodeState(project)
   const state = input as Partial<OpenCodeState>
   const now = new Date().toISOString()
   return {
-    ...createDefaultOpenCodeState(),
-    ...state,
+    ...createDefaultOpenCodeState(project),
     version: 1,
     runtime: "opencode",
-    planningScopes: state.planningScopes ?? {},
-    workers: state.workers ?? {},
+    updatedAt: typeof state.updatedAt === "string" ? state.updatedAt : now,
+    ...(sanitizeProjectMetadata(state.project) ?? project ? { project: sanitizeProjectMetadata(state.project) ?? project } : {}),
     reviews: state.reviews ?? {},
-    sessionContext: isSessionContextRecord(state.sessionContext) ? state.sessionContext : undefined,
-    lazyBridge: isLazyBridgeStatusRecord(state.lazyBridge) ? sanitizeLazyBridgeStatus(state.lazyBridge) : undefined,
-    notificationRuntime: isNotificationRuntimeRecord(state.notificationRuntime)
-      ? sanitizeNotificationRuntime(state.notificationRuntime)
-      : undefined,
     notificationQueue: Array.isArray(state.notificationQueue)
       ? state.notificationQueue
           .map((item) => sanitizeQueuedNotification(item, now))
           .filter((item): item is NonNullable<typeof item> => item !== undefined)
       : [],
-    checkpoints: state.checkpoints ?? {},
   }
+}
+
+export function mergeOpenCodeState(persisted: OpenCodeState, runtime: RuntimeOpenCodeState): OpenCodeState {
+  return {
+    ...persisted,
+    ...runtime,
+  }
+}
+
+export function extractRuntimeOpenCodeState(state: OpenCodeState): RuntimeOpenCodeState {
+  return {
+    mainSession: isMainSessionRecord(state.mainSession) ? state.mainSession : { status: "idle" },
+    planningScopes: isRecord(state.planningScopes) ? state.planningScopes : {},
+    workers: isRecord(state.workers) ? state.workers : {},
+    sessionContext: isSessionContextRecord(state.sessionContext) ? state.sessionContext : undefined,
+    lazyBridge: isLazyBridgeStatusRecord(state.lazyBridge) ? sanitizeLazyBridgeStatus(state.lazyBridge) : undefined,
+    notificationRuntime: isNotificationRuntimeRecord(state.notificationRuntime)
+      ? sanitizeNotificationRuntime(state.notificationRuntime)
+      : undefined,
+    checkpoints: isRecord(state.checkpoints) ? state.checkpoints : {},
+  }
+}
+
+export function serializeOpenCodeState(state: OpenCodeState, project?: ProjectStateMetadata): PersistedOpenCodeState {
+  return {
+    version: 1,
+    runtime: "opencode",
+    updatedAt: state.updatedAt,
+    ...(state.project ?? project ? { project: state.project ?? project } : {}),
+    reviews: state.reviews ?? {},
+    notificationQueue: state.notificationQueue ?? [],
+  }
+}
+
+export function hasPersistedOpenCodeChanges(current: OpenCodeState, next: OpenCodeState): boolean {
+  return JSON.stringify(persistedChangeShape(current)) !== JSON.stringify(persistedChangeShape(next))
+}
+
+function persistedChangeShape(state: OpenCodeState) {
+  return {
+    project: state.project,
+    reviews: state.reviews ?? {},
+    notificationQueue: state.notificationQueue ?? [],
+  }
+}
+
+function isMainSessionRecord(value: unknown): value is OpenCodeState["mainSession"] {
+  return isRecord(value) && (value.status === "idle" || value.status === "active" || value.status === "closed")
 }
 
 function isLazyBridgeStatusRecord(value: unknown): value is OpenCodeState["lazyBridge"] {
@@ -133,6 +192,28 @@ export function migrateSharedState(input: unknown): SharedState {
     version: 1,
     context: state.context ?? {},
     orphanHints: state.orphanHints ?? [],
+  }
+}
+
+function sanitizeProjectMetadata(value: unknown): ProjectStateMetadata | undefined {
+  if (!isRecord(value)) return undefined
+  if (
+    typeof value.canonicalDirectory !== "string" ||
+    typeof value.projectKey !== "string" ||
+    typeof value.projectName !== "string" ||
+    (value.stateMode !== "global" && value.stateMode !== "project")
+  ) {
+    return undefined
+  }
+
+  return {
+    canonicalDirectory: value.canonicalDirectory,
+    ...(typeof value.worktree === "string" ? { worktree: value.worktree } : {}),
+    projectKey: value.projectKey,
+    projectName: value.projectName,
+    stateMode: value.stateMode,
+    ...(typeof value.migratedFrom === "string" ? { migratedFrom: value.migratedFrom } : {}),
+    ...(typeof value.migratedAt === "string" ? { migratedAt: value.migratedAt } : {}),
   }
 }
 

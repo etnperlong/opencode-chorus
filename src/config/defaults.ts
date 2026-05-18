@@ -1,4 +1,5 @@
 export const DEFAULT_STATE_DIR = ".chorus"
+export const DEFAULT_STATE_MODE = "global"
 export const DEFAULT_SHARED_STATE_MODE = "compatible"
 export const DEFAULT_ENABLE_PROPOSAL_REVIEWER = true
 export const DEFAULT_ENABLE_TASK_REVIEWER = true

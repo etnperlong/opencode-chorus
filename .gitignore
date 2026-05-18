@@ -38,3 +38,5 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Chorus state dir
 .chorus/
+openspec/
+.opencode/

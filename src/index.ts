@@ -27,7 +27,14 @@ export const createPlugin: Plugin = async (ctx, options) => {
   }
   const config = loadedConfig.config
   const applyPluginConfig = createPluginConfigApplier()
-  const stateStore = new StateStore(ctx.directory, config.stateDir)
+  const stateStore = new StateStore({
+    projectRoot: ctx.directory,
+    worktree: ctx.worktree,
+    stateMode: config.stateMode,
+    stateDir: config.stateDir,
+    globalStateRoot: config.globalStateRoot,
+  })
+  await stateStore.init()
   const chorusClient = new ChorusMcpClient({
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
@@ -86,10 +93,18 @@ export const createPlugin: Plugin = async (ctx, options) => {
   if (loadedConfig.metadata.apiKeySource === "chorus.json") {
     await logger.warn("Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.")
   }
+  if (loadedConfig.metadata.stateDirSource && config.stateMode !== "project") {
+    await logger.warn("Chorus stateDir is deprecated and ignored unless stateMode is project.")
+  }
+  if (stateStore.fallbackReason) {
+    await logger.warn("Fell back to project-local Chorus state", { reason: stateStore.fallbackReason })
+  }
   await logger.info("Initializing opencode-chorus", {
     directory: ctx.directory,
     worktree: ctx.worktree,
     chorusUrl: config.chorusUrl,
+    stateMode: stateStore.paths.mode,
+    stateFile: stateStore.paths.stateFile,
   })
   await notificationCoordinator.start()
 

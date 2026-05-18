@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { mkdir, mkdtemp, rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { resolveChorusPaths } from "../../src/state/paths"
 import { buildSessionFile, deleteSessionFile } from "../../src/state/session-files"
 
 describe("buildSessionFile", () => {
@@ -47,12 +48,5 @@ describe("deleteSessionFile", () => {
 })
 
 function pathsFor(rootDir: string) {
-  return {
-    rootDir,
-    stateFile: join(rootDir, "opencode-state.json"),
-    sharedFile: join(rootDir, "shared.json"),
-    legacyClaudeStateFile: join(rootDir, "state.json"),
-    sessionsDir: join(rootDir, "sessions"),
-    locksDir: join(rootDir, "locks"),
-  }
+  return resolveChorusPaths(rootDir, ".")
 }

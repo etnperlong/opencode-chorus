@@ -35,7 +35,7 @@ export class SessionLifecycle {
     }))
 
     if (chorusSessionUuid) {
-      await writeSessionFile(this.stateStore.paths, "main", {
+      if (this.stateStore.usesProjectLocalState()) await writeSessionFile(this.stateStore.paths, "main", {
         sessionUuid: chorusSessionUuid,
         agentName: "main",
         agentType: "main",
@@ -90,7 +90,7 @@ export class SessionLifecycle {
     })
 
     if (!stopped) return
-    await deleteSessionFile(this.stateStore.paths, "main")
+    if (this.stateStore.usesProjectLocalState()) await deleteSessionFile(this.stateStore.paths, "main")
     await this.chorusClient.disconnect()
   }
 }

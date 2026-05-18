@@ -11,10 +11,12 @@ import {
   DEFAULT_REVIEWER_WAIT_TIMEOUT_MS,
   DEFAULT_SHARED_STATE_MODE,
   DEFAULT_STATE_DIR,
+  DEFAULT_STATE_MODE,
 } from "./defaults"
 
 export type SharedStateMode = "compatible" | "isolated"
 export type ReviewGateOutputMode = "summary" | "detailed"
+export type StateMode = "global" | "project"
 
 export type OpenCodeChorusConfig = {
   chorusUrl: string
@@ -30,6 +32,8 @@ export type OpenCodeChorusConfig = {
   enableSessionContextSummary: boolean
   enableNotificationHints: boolean
   reviewGateOutputMode: ReviewGateOutputMode
+  stateMode: StateMode
+  globalStateRoot?: string
   stateDir: string
   sharedStateMode: SharedStateMode
 }
@@ -92,10 +96,17 @@ export function resolveConfig(input: Record<string, unknown>): OpenCodeChorusCon
         : Boolean(input.enableNotificationHints),
     reviewGateOutputMode:
       input.reviewGateOutputMode === "detailed" ? "detailed" : DEFAULT_REVIEW_GATE_OUTPUT_MODE,
+    stateMode: input.stateMode === "project" ? "project" : DEFAULT_STATE_MODE,
+    ...(optionalString(input.globalStateRoot) ? { globalStateRoot: optionalString(input.globalStateRoot) } : {}),
     stateDir: String(input.stateDir ?? DEFAULT_STATE_DIR),
     sharedStateMode:
       input.sharedStateMode === "isolated" ? "isolated" : DEFAULT_SHARED_STATE_MODE,
   }
+}
+
+function optionalString(value: unknown): string | undefined {
+  const trimmed = typeof value === "string" ? value.trim() : undefined
+  return trimmed ? trimmed : undefined
 }
 
 function resolvePositiveInteger(value: unknown, defaultValue: number): number {

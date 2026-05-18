@@ -154,6 +154,60 @@ describe("config loader", () => {
     }
   })
 
+  it("defaults runtime state storage to global mode", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      const { config } = await loadChorusConfig(
+        {
+          chorusUrl: "http://localhost:8637",
+          apiKey: "test-key",
+        },
+        { OPENCODE_CONFIG_DIR: configDir },
+      )
+
+      expect(config.stateMode).toBe("global")
+      expect(config.globalStateRoot).toBeUndefined()
+      expect(config.stateDir).toBe(".chorus")
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("applies state storage precedence across file, env, and explicit options", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      await writeFile(
+        join(configDir, "chorus.json"),
+        JSON.stringify({
+          chorusUrl: "http://chorus-from-file:3000",
+          apiKey: "file-key",
+          stateMode: "project",
+          globalStateRoot: "/from-file",
+        }),
+      )
+
+      const { config, metadata } = await loadChorusConfig(
+        { stateMode: "global", globalStateRoot: "/from-options" },
+        {
+          OPENCODE_CONFIG_DIR: configDir,
+          CHORUS_BASE_URL: "http://chorus-from-env:3000",
+          CHORUS_API_KEY: "env-key",
+          CHORUS_STATE_MODE: "project",
+          CHORUS_GLOBAL_STATE_ROOT: "/from-env",
+        },
+      )
+
+      expect(config.stateMode).toBe("global")
+      expect(config.globalStateRoot).toBe("/from-options")
+      expect(metadata.stateModeSource).toBe("options")
+      expect(metadata.globalStateRootSource).toBe("options")
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
   it("reads observability config values from chorus.json", async () => {
     const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
 

@@ -20,7 +20,7 @@ The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for 
 
 | Feature Category | Components | Description |
 |---|---|---|
-| **Lifecycle Hooks** | State Management | Keeps your OpenCode session state in sync with the `.chorus` directory. |
+| **Lifecycle Hooks** | State Management | Keeps reviewer state and notification delivery data in OpenCode's per-user state directory. |
 | | Lazy MCP Bridge | Exposes `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`, then discovers real Chorus tools from the Chorus MCP server on demand. |
 | **Review Agents** | Proposal Reviewer | Automated review agent that evaluates proposals and waits for verdicts. |
 | | Task Reviewer | Automated review agent that verifies completed tasks. |
@@ -70,6 +70,13 @@ export CHORUS_ENABLE_NOTIFICATION_HINTS="true"
 export CHORUS_REVIEW_GATE_OUTPUT_MODE="summary" # summary or detailed
 ```
 
+Optional state storage settings:
+
+```bash
+export CHORUS_STATE_MODE="global" # global or project
+export CHORUS_GLOBAL_STATE_ROOT="/custom/opencode/chorus/state"
+```
+
 Alternatively, you can create a `chorus.json` file in your OpenCode configuration directory (`~/.config/opencode/chorus.json`):
 
 ```json
@@ -79,18 +86,33 @@ Alternatively, you can create a `chorus.json` file in your OpenCode configuratio
   "enableTaskReviewer": true,
   "enableSessionContextSummary": true,
   "enableNotificationHints": true,
-  "reviewGateOutputMode": "summary"
+  "reviewGateOutputMode": "summary",
+  "stateMode": "global",
+  "globalStateRoot": "/custom/opencode/chorus/state"
 }
 ```
 *Note: While you can put your API key in `chorus.json`, using the `CHORUS_API_KEY` environment variable is strongly recommended for security.*
 
 Observability behavior:
 
-- `enableSessionContextSummary` controls one concise startup/resume Chorus context summary. When disabled, context is still stored locally for recovery, but no proactive summary is shown.
+- `enableSessionContextSummary` controls one concise startup/resume Chorus context summary. When disabled, context remains runtime-only and no proactive summary is shown.
 - `enableNotificationHints` controls actionable text on routed notification queue entries. When disabled, supported notifications are still queued without hint text.
 - `reviewGateOutputMode` controls reviewer gate output verbosity. `summary` keeps output concise; `detailed` includes expanded reviewer job, round, target, comment, timeout, escalation, and verdict details.
 
 These settings only control visibility and hints. They do not auto-claim tasks, approve proposals, or verify tasks.
+
+State storage behavior:
+
+- `stateMode` defaults to `global`, which stores OpenCode-owned Chorus state outside the project workspace.
+- Linux uses `${XDG_STATE_HOME}/opencode/chorus` when `XDG_STATE_HOME` is set, otherwise `~/.local/state/opencode/chorus`.
+- macOS uses `~/Library/Application Support/OpenCode/Chorus`.
+- Windows uses `%LOCALAPPDATA%\OpenCode\Chorus`, with `%APPDATA%` or a home-directory fallback only if `LOCALAPPDATA` is unavailable.
+- Each project gets a stable `<basename>-<hash>` directory derived from OpenCode's canonical `ctx.directory`; `ctx.worktree` is stored as diagnostic metadata when available.
+- The persisted file keeps only reviewer state, notification queue data, and project metadata. Session context, lazy bridge status, notification connection status, planning scopes, workers, and checkpoints are runtime-only.
+- On first startup, an existing `.chorus/opencode-state.json` is migrated into the global store if the target global state file does not already exist. Only still-supported persisted fields are imported.
+- After successful migration, known plugin-owned legacy files such as `.chorus/opencode-state.json`, `.chorus/shared.json`, and `.chorus/sessions/main.json` are cleaned up. Unknown files are preserved.
+- To temporarily roll back to project-local storage, set `CHORUS_STATE_MODE=project` or `"stateMode": "project"`. In project mode, `stateDir` is honored and defaults to `.chorus`.
+- `stateDir` is deprecated for default global storage and is ignored unless project-local mode is explicitly selected.
 
 ### Lazy Chorus Tools
 

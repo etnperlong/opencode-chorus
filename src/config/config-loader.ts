@@ -9,6 +9,9 @@ export type ChorusConfigLoadResult = {
   config: OpenCodeChorusConfig
   metadata: {
     apiKeySource?: "chorus.json" | "env" | "options"
+    stateModeSource?: ConfigSource
+    globalStateRootSource?: ConfigSource
+    stateDirSource?: ConfigSource
   }
 }
 
@@ -23,6 +26,7 @@ export class InvalidChorusConfigError extends Error {
 }
 
 type PartialConfig = Record<string, unknown>
+type ConfigSource = "chorus.json" | "env" | "options"
 
 const CHORUS_CONFIG_FILE = "chorus.json"
 
@@ -46,6 +50,9 @@ export async function loadChorusConfig(
     config: resolveConfig(merged),
     metadata: {
       apiKeySource: resolveApiKeySource(fileConfig, envConfig, optionsConfig),
+      stateModeSource: resolveConfigSource("stateMode", fileConfig, envConfig, optionsConfig),
+      globalStateRootSource: resolveConfigSource("globalStateRoot", fileConfig, envConfig, optionsConfig),
+      stateDirSource: resolveConfigSource("stateDir", fileConfig, envConfig, optionsConfig),
     },
   }
 }
@@ -82,6 +89,8 @@ function parseEnvConfig(env: ChorusConfigEnv): PartialConfig {
     chorusUrl: firstNonEmpty(env.CHORUS_BASE_URL, env.CHORUS_URL),
     apiKey: nonEmpty(env.CHORUS_API_KEY),
     projectUuids: parseCsv(env.CHORUS_PROJECT_UUIDS),
+    stateMode: parseStateMode(env.CHORUS_STATE_MODE),
+    globalStateRoot: nonEmpty(env.CHORUS_GLOBAL_STATE_ROOT),
     stateDir: nonEmpty(env.CHORUS_STATE_DIR),
     sharedStateMode: nonEmpty(env.CHORUS_SHARED_STATE_MODE),
     autoStart: parseBoolean(env.CHORUS_AUTO_START),
@@ -95,6 +104,17 @@ function parseEnvConfig(env: ChorusConfigEnv): PartialConfig {
     enableNotificationHints: parseBoolean(env.CHORUS_ENABLE_NOTIFICATION_HINTS),
     reviewGateOutputMode: parseReviewGateOutputMode(env.CHORUS_REVIEW_GATE_OUTPUT_MODE),
   })
+}
+
+function resolveConfigSource(
+  key: string,
+  fileConfig: PartialConfig,
+  envConfig: PartialConfig,
+  optionsConfig: PartialConfig,
+): ConfigSource | undefined {
+  if (Object.hasOwn(optionsConfig, key)) return "options"
+  if (Object.hasOwn(envConfig, key)) return "env"
+  if (Object.hasOwn(fileConfig, key)) return "chorus.json"
 }
 
 function resolveApiKeySource(
@@ -146,6 +166,11 @@ function parsePositiveInteger(value: string | undefined): number | undefined {
 function parseReviewGateOutputMode(value: string | undefined): "summary" | "detailed" | undefined {
   const normalized = value?.trim().toLowerCase()
   if (normalized === "summary" || normalized === "detailed") return normalized
+}
+
+function parseStateMode(value: string | undefined): "global" | "project" | undefined {
+  const normalized = value?.trim().toLowerCase()
+  if (normalized === "global" || normalized === "project") return normalized
 }
 
 function expandHome(path: string): string {
