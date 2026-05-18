@@ -47,12 +47,13 @@ export type ReviewRecord = {
   blockersSnapshot: string[]
 }
 
-export type AgentPermissionsRecord = Record<string, boolean>
+export type AgentPermissionsRecord = Record<string, boolean | string[]>
 
 export type SessionContextAgentRecord = {
   uuid?: string
   name?: string
   permissions?: string[] | AgentPermissionsRecord
+  /** Deprecated: Chorus v0.8+ no longer returns roles in checkin responses. */
   roles?: string[]
 }
 

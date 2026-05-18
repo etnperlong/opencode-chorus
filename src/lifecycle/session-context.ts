@@ -2,13 +2,14 @@ import type { SessionContextRecord } from "../state/state-types"
 
 export function buildSessionContext(checkin: unknown, runtimeSessionId: string, now = new Date()): SessionContextRecord {
   const record = isRecord(checkin) ? checkin : {}
+  const agentRecord = isRecord(record.agent) ? record.agent : {}
   return {
     source: "chorus_checkin",
     runtimeSessionId,
     lastRefreshedAt: now.toISOString(),
-    agent: readAgent(record.agent),
-    owner: readNamedEntity(record.owner),
-    projects: readProjects(record.projects),
+    agent: readAgent(agentRecord),
+    owner: readNamedEntity(agentRecord.owner),
+    projects: record.projects === undefined ? readIdeaTracker(record.ideaTracker) : readProjects(record.projects),
     notifications: { unread: readUnreadNotificationCount(record.notifications) },
   }
 }
@@ -24,13 +25,11 @@ export function formatSessionContextSummary(context: SessionContextRecord): stri
 function readAgent(value: unknown): SessionContextRecord["agent"] {
   if (!isRecord(value)) return undefined
   const permissions = readPermissions(value.permissions)
-  const roles = Array.isArray(value.roles) ? value.roles.map(String) : undefined
 
   return {
     ...(typeof value.uuid === "string" ? { uuid: value.uuid } : {}),
     ...(typeof value.name === "string" ? { name: value.name } : {}),
     ...(permissions !== undefined ? { permissions } : {}),
-    ...(roles !== undefined ? { roles } : {}),
   }
 }
 
@@ -44,9 +43,9 @@ function readPermissions(value: unknown): SessionContextRecord["agent"] extends 
 
   return Object.fromEntries(
     Object.entries(value)
-      .filter(([, allowed]) => typeof allowed === "boolean")
-      .map(([permission, allowed]) => [permission, allowed]),
-  ) as Record<string, boolean>
+      .filter(([, allowed]) => typeof allowed === "boolean" || Array.isArray(allowed))
+      .map(([permission, allowed]) => [permission, Array.isArray(allowed) ? allowed.map(String) : allowed]),
+  ) as Record<string, boolean | string[]>
 }
 
 function readNamedEntity(value: unknown): { uuid?: string; name?: string } | undefined {
@@ -71,6 +70,36 @@ function readProjects(value: unknown): SessionContextRecord["projects"] {
       },
     ]
   })
+}
+
+function readIdeaTracker(value: unknown): SessionContextRecord["projects"] {
+  if (!isRecord(value)) return []
+  return Object.entries(value).flatMap(([uuid, item]) => {
+    if (!isRecord(item) || typeof item.name !== "string") return []
+    const ideas = Array.isArray(item.ideas) ? item.ideas : []
+    const taskCount = sumIdeaField(ideas, "taskCount")
+    const pendingProposalCount = sumIdeaField(ideas, "pendingProposalCount")
+    return [
+      {
+        uuid,
+        name: item.name,
+        ideaCount: ideas.length,
+        ...(taskCount !== undefined ? { taskCount } : {}),
+        ...(pendingProposalCount !== undefined ? { pendingProposalCount } : {}),
+      },
+    ]
+  })
+}
+
+function sumIdeaField(ideas: unknown[], field: "taskCount" | "pendingProposalCount"): number | undefined {
+  let total = 0
+  let found = false
+  for (const idea of ideas) {
+    if (!isRecord(idea) || typeof idea[field] !== "number") continue
+    total += idea[field]
+    found = true
+  }
+  return found ? total : undefined
 }
 
 function readUnreadNotificationCount(value: unknown): number {

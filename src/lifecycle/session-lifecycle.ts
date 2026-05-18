@@ -1,5 +1,4 @@
 import type { ChorusMcpClient } from "../chorus/mcp-client"
-import { deleteSessionFile, writeSessionFile } from "../state/session-files"
 import type { StateStore } from "../state/state-store"
 import type { Logger } from "../util/logger"
 import { buildSessionContext, formatSessionContextSummary } from "./session-context"
@@ -19,31 +18,18 @@ export class SessionLifecycle {
     }
     if (!options.replaceExisting && !shouldStartMainSession(current.mainSession.runtimeSessionId, runtimeSessionId)) return
 
-    const checkin = await this.chorusClient.callTool<{ session?: { uuid?: string } }>("chorus_checkin")
-    const chorusSessionUuid = checkin?.session?.uuid
+    const checkin = await this.chorusClient.callTool("chorus_checkin")
     const sessionContext = buildSessionContext(checkin, runtimeSessionId)
 
     await this.stateStore.updateOpenCodeState((state) => ({
       ...state,
       mainSession: {
         runtimeSessionId,
-        chorusSessionUuid,
         status: "active",
         lastHeartbeatAt: new Date().toISOString(),
       },
       sessionContext,
     }))
-
-    if (chorusSessionUuid) {
-      if (this.stateStore.usesProjectLocalState()) await writeSessionFile(this.stateStore.paths, "main", {
-        sessionUuid: chorusSessionUuid,
-        agentName: "main",
-        agentType: "main",
-        chorusUrl: this.chorusUrl,
-        runtimeSessionId,
-        workerKind: "main",
-      })
-    }
   }
 
   async heartbeat(runtimeSessionId: string): Promise<void> {
@@ -90,7 +76,6 @@ export class SessionLifecycle {
     })
 
     if (!stopped) return
-    if (this.stateStore.usesProjectLocalState()) await deleteSessionFile(this.stateStore.paths, "main")
     await this.chorusClient.disconnect()
   }
 }
