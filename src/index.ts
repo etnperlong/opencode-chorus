@@ -11,6 +11,7 @@ import { ChorusReadiness } from "./lifecycle/chorus-readiness"
 import { PlanningLifecycle } from "./lifecycle/planning-lifecycle"
 import { SessionLifecycle } from "./lifecycle/session-lifecycle"
 import { NotificationCoordinator } from "./notifications/notification-coordinator"
+import { ReviewerToastCoordinator } from "./reviewers/reviewer-toast"
 import { StateStore } from "./state/state-store"
 import { createChorusLazyBridge } from "./tools/lazy-bridge-tools"
 import { createLogger } from "./util/logger"
@@ -80,6 +81,10 @@ export const createPlugin: Plugin = async (ctx, options) => {
   })
   const readiness = readinessRef.current
   const planningLifecycle = new PlanningLifecycle(stateStore)
+  const reviewerToast = new ReviewerToastCoordinator({
+    tui,
+    runningToastDurationMs: config.reviewerWaitTimeoutMs,
+  })
   const notificationCoordinator = new NotificationCoordinator({
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
@@ -117,6 +122,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
       directory: ctx.directory,
     },
     chorusClient,
+    reviewerToast,
   })
   const permissionAskHook = createPermissionAskHook({
     stagingDir: stateStore.paths.stagingDir,

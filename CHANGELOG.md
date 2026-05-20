@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Added explicit notification project scoping through `projectUuids` / `CHORUS_PROJECT_UUIDS`, plus a `notification-scope` evaluator that records the last scope decision for runtime diagnostics.
 - Added regression coverage for notification project allowlists, unresolved-scope suppression, missing `projectUuid`, main-session handoff, queue continuity, and duplicate-delivery prevention.
 - Added bounded native-agent `Chorus Context` injection from cached runtime state, including managed, unmanaged, and ambiguous project-scope guidance plus owner, permission, and OpenSpec availability summaries.
+- Added reviewer TUI toast notifications that show target names, review rounds, completion verdicts, and aggregate multiple concurrently running reviewers without exposing reviewer session IDs.
 
 ### Changed
 

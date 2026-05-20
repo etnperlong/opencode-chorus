@@ -15,8 +15,10 @@ type RealChorusSseListenerInstance = InstanceType<typeof RealChorusSseListener>
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
-const toastCalls: Array<{ title?: string; message?: string; variant?: string }> = []
+const toastCalls: Array<{ title?: string; message?: string; variant?: string; duration?: number }> = []
 let getCommentsResponse: unknown = { comments: [] }
+let getProposalResponse: unknown = {}
+let getTaskResponse: unknown = {}
 let sessionStatusResponse: Record<string, unknown> = {}
 const chorusSkillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 let configDir = ""
@@ -64,6 +66,8 @@ mock.module("../../src/chorus/mcp-client", () => ({
         }
       }
       if (name === "chorus_get_comments") return getCommentsResponse
+      if (name === "chorus_get_proposal") return getProposalResponse
+      if (name === "chorus_get_task") return getTaskResponse
       return {}
     }
 
@@ -120,6 +124,8 @@ describe("plugin hooks", () => {
     logCalls.length = 0
     toastCalls.length = 0
     getCommentsResponse = { comments: [] }
+    getProposalResponse = {}
+    getTaskResponse = {}
     sessionStatusResponse = {}
     listToolsCalls = 0
     listToolsError = undefined
@@ -390,6 +396,47 @@ describe("plugin hooks", () => {
       })
       expect(output.output).toContain('"reviewer"')
       expect(output.output).toContain('"verdict": "FAIL"')
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("shows reviewer toasts using target names and round context", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+        enableTaskReviewer: true,
+        reviewerWaitTimeoutMs: 50,
+        reviewerPollIntervalMs: 1,
+      })
+      getTaskResponse = { title: "Implement reviewer toast" }
+      getCommentsResponse = { comments: [{ content: "review\nReview-Job-ID: review-session-1\nVERDICT: PASS" }] }
+
+      await plugin["tool.execute.after"]?.(
+        {
+          tool: "chorus_submit_for_verify",
+          args: { taskUuid: "task-toast" },
+          sessionID: "session-1",
+        } as never,
+        { title: "", output: JSON.stringify({ submitted: true }), metadata: {} } as never,
+      )
+
+      expect(toastCalls).toContainEqual({
+        title: "Reviewing Implement reviewer toast (round 1/3)",
+        message: "Chorus task reviewer is running...",
+        variant: "info",
+        duration: 50,
+      })
+      expect(toastCalls).toContainEqual({
+        title: "Reviewed Implement reviewer toast (round 1/3)",
+        message: "PASS",
+        variant: "success",
+        duration: 4000,
+      })
+      expect(JSON.stringify(toastCalls)).not.toContain("review-session-1")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -1332,7 +1379,7 @@ function createContext(directory: string) {
         },
       },
       tui: {
-        showToast: async (input: { body?: { title?: string; message?: string; variant?: string } }) => {
+        showToast: async (input: { body?: { title?: string; message?: string; variant?: string; duration?: number } }) => {
           toastCalls.push(input.body ?? {})
         },
       },

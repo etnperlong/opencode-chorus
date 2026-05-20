@@ -9,6 +9,7 @@ import { buildReviewTargetSignature } from "../reviewers/review-target-signature
 import { PROPOSAL_REVIEWER_AGENT, TASK_REVIEWER_AGENT } from "../reviewers/reviewer-agents"
 import { dispatchProposalReviewer, dispatchTaskReviewer } from "../reviewers/reviewer-dispatcher"
 import { attachReviewerGateResult, attachReviewerMetadata } from "../reviewers/reviewer-output"
+import { extractReviewTargetDisplayName } from "../reviewers/reviewer-toast"
 import { waitForReviewerVerdict } from "../reviewers/reviewer-waiter"
 import { beginReviewRound, persistReviewJobId, persistReviewVerdict } from "../reviewers/review-sync"
 import type { StateStore } from "../state/state-store"
@@ -24,6 +25,24 @@ type ToolExecuteAfterOutput = {
   title: string
   output: string
   metadata: unknown
+}
+
+type ReviewerToast = {
+  started(input: {
+    reviewJobId: string
+    targetType: "proposal" | "task"
+    displayName: string
+    round: number
+    maxRounds: number
+  }): Promise<void>
+  finished(input: {
+    reviewJobId: string
+    targetType: "proposal" | "task"
+    displayName: string
+    round: number
+    maxRounds: number
+    result: Awaited<ReturnType<typeof waitForReviewerVerdict>>
+  }): Promise<void>
 }
 
 type CreateToolExecuteAfterHookOptions = {
@@ -44,6 +63,7 @@ type CreateToolExecuteAfterHookOptions = {
     directory: string
   }
   chorusClient: ChorusMcpClient
+  reviewerToast?: ReviewerToast
 }
 
 export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOptions) {
@@ -102,8 +122,8 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
 
       const targetKey = `proposal:${proposalUuid}`
       const toolScope = await resolveChorusToolScope(options.stateStore)
-      const targetSignature = await readTargetSignature(options.chorusClient, "proposal", proposalUuid, toolScope)
-      if (!targetSignature) {
+      const targetSnapshot = await readTargetSnapshot(options.chorusClient, "proposal", proposalUuid, toolScope)
+      if (!targetSnapshot) {
         const existing = await readExistingReview(options.stateStore, targetKey)
         if (existing) {
           attachReviewerGateResult(output, toReviewerWaitResult(existing), existing.lastReviewJobId ?? "unavailable", {
@@ -136,7 +156,7 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         options.stateStore,
         targetKey,
         options.config.maxProposalReviewRounds,
-        targetSignature,
+        targetSnapshot.signature,
       )
       if (review?.status === "escalated") {
         attachReviewerGateResult(output, { status: "escalated" }, review.lastReviewJobId ?? "unavailable", {
@@ -181,6 +201,13 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         },
       })
       attachReviewerMetadata(output, "Chorus proposal review", PROPOSAL_REVIEWER_AGENT, reviewJobId)
+      await options.reviewerToast?.started({
+        reviewJobId,
+        targetType: "proposal",
+        displayName: targetSnapshot.displayName,
+        round: review.currentRound,
+        maxRounds: review.maxRounds,
+      })
 
       const waitResult = await waitForReviewerVerdict({
         stateStore: options.stateStore,
@@ -194,6 +221,14 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
         scope: toolScope,
+      })
+      await options.reviewerToast?.finished({
+        reviewJobId,
+        targetType: "proposal",
+        displayName: targetSnapshot.displayName,
+        round: review.currentRound,
+        maxRounds: review.maxRounds,
+        result: waitResult,
       })
       attachReviewerGateResult(output, waitResult, reviewJobId, {
         round: review.currentRound,
@@ -211,8 +246,8 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
 
       const targetKey = `task:${taskUuid}`
       const toolScope = await resolveChorusToolScope(options.stateStore)
-      const targetSignature = await readTargetSignature(options.chorusClient, "task", taskUuid, toolScope)
-      if (!targetSignature) {
+      const targetSnapshot = await readTargetSnapshot(options.chorusClient, "task", taskUuid, toolScope)
+      if (!targetSnapshot) {
         const existing = await readExistingReview(options.stateStore, targetKey)
         if (existing) {
           attachReviewerGateResult(output, toReviewerWaitResult(existing), existing.lastReviewJobId ?? "unavailable", {
@@ -245,7 +280,7 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         options.stateStore,
         targetKey,
         options.config.maxTaskReviewRounds,
-        targetSignature,
+        targetSnapshot.signature,
       )
       if (review?.status === "escalated") {
         attachReviewerGateResult(output, { status: "escalated" }, review.lastReviewJobId ?? "unavailable", {
@@ -290,6 +325,13 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         },
       })
       attachReviewerMetadata(output, "Chorus task review", TASK_REVIEWER_AGENT, reviewJobId)
+      await options.reviewerToast?.started({
+        reviewJobId,
+        targetType: "task",
+        displayName: targetSnapshot.displayName,
+        round: review.currentRound,
+        maxRounds: review.maxRounds,
+      })
 
       const waitResult = await waitForReviewerVerdict({
         stateStore: options.stateStore,
@@ -303,6 +345,14 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         pollIntervalMs: options.config.reviewerPollIntervalMs,
         reviewJobId,
         scope: toolScope,
+      })
+      await options.reviewerToast?.finished({
+        reviewJobId,
+        targetType: "task",
+        displayName: targetSnapshot.displayName,
+        round: review.currentRound,
+        maxRounds: review.maxRounds,
+        result: waitResult,
       })
       attachReviewerGateResult(output, waitResult, reviewJobId, {
         round: review.currentRound,
@@ -328,20 +378,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
-async function readTargetSignature(
+async function readTargetSnapshot(
   client: ChorusMcpClient,
   targetType: "proposal" | "task",
   targetUuid: string,
   scope?: ChorusToolScope,
-): Promise<string | undefined> {
+): Promise<{ signature: string; displayName: string } | undefined> {
   try {
     if (targetType === "proposal") {
       const proposal = await client.callTool("chorus_get_proposal", { proposalUuid: targetUuid }, scope)
-      return buildReviewTargetSignature(targetType, proposal)
+      return {
+        signature: buildReviewTargetSignature(targetType, proposal),
+        displayName: extractReviewTargetDisplayName(targetType, proposal),
+      }
     }
 
     const task = await client.callTool("chorus_get_task", { taskUuid: targetUuid }, scope)
-    return buildReviewTargetSignature(targetType, task)
+    return {
+      signature: buildReviewTargetSignature(targetType, task),
+      displayName: extractReviewTargetDisplayName(targetType, task),
+    }
   } catch {
     return undefined
   }
