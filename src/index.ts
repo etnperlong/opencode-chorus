@@ -15,6 +15,8 @@ import { StateStore } from "./state/state-store"
 import { createChorusLazyBridge } from "./tools/lazy-bridge-tools"
 import { createLogger } from "./util/logger"
 
+const REVIEWER_AGENTS = new Set(["proposal-reviewer", "task-reviewer"])
+
 export const createPlugin: Plugin = async (ctx, options) => {
   const logger = createLogger(ctx.client)
   let loadedConfig
@@ -120,6 +122,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
     stagingDir: stateStore.paths.stagingDir,
   })
   const systemTransformHook = createSystemTransformHook({
+    stateStore,
+    projectUuids: config.projectUuids,
+    directory: ctx.directory,
     stagingDir: stateStore.paths.stagingDir,
   })
   if (loadedConfig.metadata.apiKeySource === "chorus.json") {
@@ -140,6 +145,16 @@ export const createPlugin: Plugin = async (ctx, options) => {
   })
   await notificationCoordinator.start()
 
+  const hydrateSessionContext = async (sessionID: string, agent: string) => {
+    if (REVIEWER_AGENTS.has(agent)) return
+
+    await sessionLifecycle.start(sessionID)
+    if (config.enableSessionContextSummary) {
+      await sessionLifecycle.surfaceContextSummary(sessionID, logger, stateStore.paths.stagingDir)
+    }
+    await notificationCoordinator.start()
+  }
+
   return {
     config: applyPluginConfig,
     event: eventHook,
@@ -147,13 +162,12 @@ export const createPlugin: Plugin = async (ctx, options) => {
     "tool.execute.after": toolExecuteAfterHook,
     "experimental.chat.system.transform": systemTransformHook,
     "chat.params": async ({ sessionID, agent }) => {
-      if (agent === "chorus") {
-        await readiness.ensureReady(sessionID, "visible").catch(async (error) => {
-          await logger.warn("Chorus readiness failed on first chorus agent turn", {
-            error: error instanceof Error ? error.message : String(error),
-          })
+      await hydrateSessionContext(sessionID, agent).catch(async (error) => {
+        await logger.warn("Chorus session context hydration failed on chat.params", {
+          error: error instanceof Error ? error.message : String(error),
+          agent,
         })
-      }
+      })
     },
     tool: lazyBridge.tools,
   }

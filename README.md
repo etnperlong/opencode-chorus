@@ -14,7 +14,7 @@ Release notes are tracked in [CHANGELOG.md](./CHANGELOG.md).
 
 When enabled, `opencode-chorus` loads Chorus workflow skills and exposes a lazy Chorus tool bridge inside OpenCode. You don't need to configure tools or link skill directories manually.
 
-The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for the AI-DLC process.
+The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for the AI-DLC process. It no longer registers a dedicated `chorus` Agent inside OpenCode. Instead, native OpenCode agents load Chorus skills as needed and call Chorus through the lazy bridge tools.
 
 ### Components
 
@@ -24,7 +24,7 @@ The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for 
 | | Lazy MCP Bridge | Exposes `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`, then discovers real Chorus tools from the Chorus MCP server on demand. |
 | **Review Agents** | Proposal Reviewer | Automated review agent that evaluates proposals and waits for verdicts. |
 | | Task Reviewer | Automated review agent that verifies completed tasks. |
-| **Workflow Skills** | `chorus` | The entry point. Platform overview, shared tools, and lifecycle rules. |
+| **Workflow Skills** | `chorus` | The entry-point skill. Platform overview, shared tools, and lifecycle rules for native OpenCode agents. |
 | | `chorus-idea` | Claim ideas, elaborate on requirements, and confirm with owners. |
 | | `chorus-proposal` | Draft PRDs, tech designs, and task dependency graphs. |
 | | `chorus-develop` | Implement tasks, report work, and run self-checks before verification. |
@@ -133,6 +133,22 @@ The plugin no longer injects a remote `mcp.chorus` server into OpenCode by defau
 
 For example, to update a task status, first call `chorus_tools`, then inspect `chorus_update_task` with `chorus_tool_get`, then execute it through the bridge. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
 
+### Native Agent Workflow
+
+- The dedicated `chorus` Agent has been removed.
+- Use OpenCode's native agent for Chorus work, then load the right bundled skill for the stage you are in: `chorus` for overview, `chorus-idea` for ideas, `chorus-proposal` for proposal drafting, `chorus-develop` or `chorus-quick-dev` for implementation, `chorus-review` for governance, and `chorus-yolo` for full automation.
+- Native agents can call `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` directly. The plugin still reserves the specialized `proposal-reviewer` and `task-reviewer` child agents for reviewer gates.
+
+### Managed Project Context
+
+At session start or resume, the plugin injects a bounded `Chorus Context` summary into the native agent's system prompt using cached runtime state. This keeps project routing guidance available without requiring a dedicated Chorus agent or an extra network call during prompt construction.
+
+- `managed`: the plugin can confidently identify the active Chorus project and includes the project name and UUID.
+- `unmanaged`: no single Chorus project can be proven, so the injected context explicitly warns the agent not to assume a `projectUuid`.
+- `ambiguous`: multiple Chorus projects may apply, so the injected context reports the candidate count and avoids guessing.
+
+When available, the same injected context also includes owner metadata, permission scope, OpenSpec availability, and the Chorus staging directory guidance used by path-based document uploads.
+
 #### Document Body Uploads Are Path-Only
 
 The four managed document write tools — `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` — require a `contentPath` parameter instead of inline `content`.
@@ -147,4 +163,4 @@ Passing inline `content` to any of these tools returns a local error and stops t
 
 After installing the plugin and setting your credentials, restart OpenCode.
 
-You will see the Chorus skills in your workspace. Start by asking OpenCode to use the `chorus` skill to inspect available permissions and route into the right workflow, or run a specific stage like `chorus-idea` or `chorus-yolo`.
+You will see the bundled Chorus skills in your workspace. Start by asking OpenCode to load the `chorus` skill to inspect available permissions and route into the right workflow, or load a specific stage skill such as `chorus-idea`, `chorus-develop`, or `chorus-yolo`.

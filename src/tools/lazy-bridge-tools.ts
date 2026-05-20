@@ -20,7 +20,6 @@ type ChorusLazyBridgeClient = {
   callTool<T>(name: string, args?: Record<string, unknown>, scope?: ChorusToolScope): Promise<T>
 }
 
-const CHORUS_ALLOWED_AGENTS = new Set(["chorus", "proposal-reviewer", "task-reviewer"])
 const CHORUS_SILENT_AGENTS = new Set(["proposal-reviewer", "task-reviewer"])
 
 type CreateChorusLazyBridgeToolsOptions = {
@@ -183,7 +182,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
       description: "List all available Chorus tools before inspecting or executing one.",
       args: {},
       async execute(_args, ctx) {
-        enforceAgentAllowList(ctx.agent)
         await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         return formatToolResult(listTools(index))
@@ -196,7 +194,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
         toolName: tool.schema.string().describe("Exact Chorus tool name from chorus_tools, for example: `chorus_get_task`"),
       },
       async execute(args, ctx) {
-        enforceAgentAllowList(ctx.agent)
         await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         const target = index.find((item) => item.name === args.toolName)
@@ -215,7 +212,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
           .describe("Arguments for the Chorus tool"),
       },
       async execute(args, ctx) {
-        enforceAgentAllowList(ctx.agent)
         await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         const toolName = args.toolName
@@ -235,14 +231,6 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
   }
 
   return { tools, refresh }
-}
-
-function enforceAgentAllowList(agent: string): void {
-  if (!CHORUS_ALLOWED_AGENTS.has(agent)) {
-    throw new Error(
-      `Chorus bridge tools are only available to the chorus, proposal-reviewer, and task-reviewer agents. Current agent: ${agent}`,
-    )
-  }
 }
 
 async function triggerSilentReadinessIfNeeded(

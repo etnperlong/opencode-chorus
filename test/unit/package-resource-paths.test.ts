@@ -9,13 +9,11 @@ describe("package resource paths", () => {
     expect((await stat(bundledSkillsDir)).isDirectory()).toBe(true)
     expect((await stat(join(bundledSkillsDir, "chorus-openspec", "SKILL.md"))).isFile()).toBe(true)
 
-    const promptUrl = getBundledPromptUrl("chorus-agent.md")
-    expect(basename(promptUrl.pathname)).toBe("chorus-agent.md")
-
-    const prompt = await readBundledPrompt("chorus-agent.md")
-    expect(prompt).toContain("chorus_tools")
-    expect(prompt).toContain("chorus_tool_get")
-    expect(prompt).toContain("chorus_tool_execute")
+    for (const promptName of ["proposal-reviewer.md", "task-reviewer.md"]) {
+      const promptUrl = getBundledPromptUrl(promptName)
+      expect(basename(promptUrl.pathname)).toBe(promptName)
+      expect(await readBundledPrompt(promptName)).toContain("VERDICT:")
+    }
   })
 
   it("keeps reviewer prompt comment contracts explicit", async () => {

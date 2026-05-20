@@ -1,5 +1,4 @@
 import type { Config } from "@opencode-ai/plugin"
-import { applyChorusAgentConfig } from "../agents/chorus-agent"
 import { applyReviewerAgentConfig } from "../reviewers/reviewer-agents"
 import { bundledSkillsDir } from "../util/package-resource-paths"
 
@@ -30,8 +29,6 @@ export function createPluginConfigApplier() {
     if (!hasBundledSkillsDir) {
       configWithPluginState.skills.paths.push(bundledSkillsDir)
     }
-
-    await applyChorusAgentConfig(config)
     await applyReviewerAgentConfig(config)
   }
 }

@@ -18,26 +18,21 @@ describe("Chorus lazy bridge tools", () => {
     expect(readOutput(result)).toContain("Update a task")
   })
 
-  it("rejects bridge tool calls from non-Chorus agents", async () => {
+  it("allows native OpenCode agents to use bridge tools", async () => {
     const tools = createChorusLazyBridgeTools({
       chorusClient: createClient(),
     })
 
-    await expect(tools.chorus_tools!.execute({}, createToolContext("build"))).rejects.toThrow(
-      "Chorus bridge tools are only available to the chorus, proposal-reviewer, and task-reviewer agents. Current agent: build",
-    )
-    await expect(tools.chorus_tool_get!.execute({ toolName: "chorus_get_task" }, createToolContext("other-agent"))).rejects.toThrow(
-      /only available to the chorus/,
-    )
-    await expect(tools.chorus_tool_execute!.execute({ toolName: "chorus_get_task" }, createToolContext("general"))).rejects.toThrow(
-      /only available to the chorus/,
-    )
+    await expect(tools.chorus_tools!.execute({}, createToolContext("build"))).resolves.toBeDefined()
+    await expect(tools.chorus_tool_get!.execute({ toolName: "chorus_get_task" }, createToolContext("other-agent"))).resolves.toBeDefined()
+    await expect(
+      tools.chorus_tool_execute!.execute({ toolName: "chorus_get_task", arguments: { taskUuid: "t-1" } }, createToolContext("general")),
+    ).resolves.toBeDefined()
   })
 
-  it("allows chorus, proposal-reviewer, and task-reviewer agents to use bridge tools", async () => {
+  it("allows reviewer agents to use bridge tools", async () => {
     const tools = createChorusLazyBridgeTools({ chorusClient: createClient() })
 
-    await expect(tools.chorus_tools!.execute({}, createToolContext("chorus"))).resolves.toBeDefined()
     await expect(tools.chorus_tools!.execute({}, createToolContext("proposal-reviewer"))).resolves.toBeDefined()
     await expect(tools.chorus_tools!.execute({}, createToolContext("task-reviewer"))).resolves.toBeDefined()
   })
@@ -77,7 +72,7 @@ describe("Chorus lazy bridge tools", () => {
     expect(readinessCalls).toEqual([{ sessionId: "reviewer-session", mode: "silent" }])
   })
 
-  it("does NOT trigger readiness for chorus agent (handled via chat.params hook)", async () => {
+  it("does NOT trigger silent readiness for native agents", async () => {
     const readinessCalls: string[] = []
     const tools = createChorusLazyBridgeTools({
       chorusClient: createClient(),
@@ -88,7 +83,7 @@ describe("Chorus lazy bridge tools", () => {
       },
     })
 
-    await tools.chorus_tools!.execute({}, createToolContext("chorus"))
+    await tools.chorus_tools!.execute({}, createToolContext("build"))
 
     expect(readinessCalls).toEqual([])
   })
