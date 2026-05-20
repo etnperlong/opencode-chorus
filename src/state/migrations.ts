@@ -147,12 +147,42 @@ function isNotificationRuntimeRecord(value: unknown): value is OpenCodeState["no
 
 function sanitizeNotificationRuntime(value: OpenCodeState["notificationRuntime"]): OpenCodeState["notificationRuntime"] {
   if (!value) return undefined
+  const lastScopeEvaluation = sanitizeNotificationScopeEvaluation(value.lastScopeEvaluation)
   return {
     status: value.status,
     ...(typeof value.lastEventAt === "string" ? { lastEventAt: value.lastEventAt } : {}),
     ...(typeof value.lastConnectedAt === "string" ? { lastConnectedAt: value.lastConnectedAt } : {}),
     ...(typeof value.lastReconnectAt === "string" ? { lastReconnectAt: value.lastReconnectAt } : {}),
     ...(typeof value.lastError === "string" ? { lastError: value.lastError } : {}),
+    ...(lastScopeEvaluation ? { lastScopeEvaluation } : {}),
+  }
+}
+
+type NotificationScopeEvaluationRecord = NonNullable<NonNullable<OpenCodeState["notificationRuntime"]>["lastScopeEvaluation"]>
+
+function sanitizeNotificationScopeEvaluation(
+  value: unknown,
+): NotificationScopeEvaluationRecord | undefined {
+  if (!isRecord(value) || typeof value.notificationUuid !== "string" || typeof value.outcome !== "string") {
+    return undefined
+  }
+  return {
+    notificationUuid: value.notificationUuid,
+    outcome: value.outcome === "in_scope" || value.outcome === "out_of_scope" ? value.outcome : "unresolved",
+    source:
+      value.source === "config" || value.source === "shared" || value.source === "session" ? value.source : "unresolved",
+    reason:
+      value.reason === "project_allowed" ||
+      value.reason === "project_not_in_scope" ||
+      value.reason === "missing_notification_project" ||
+      value.reason === "multiple_session_projects"
+        ? value.reason
+        : "missing_scope_context",
+    ...(typeof value.notificationProjectUuid === "string"
+      ? { notificationProjectUuid: value.notificationProjectUuid }
+      : {}),
+    scopeProjectUuids: Array.isArray(value.scopeProjectUuids) ? value.scopeProjectUuids.map(String) : [],
+    recordedAt: typeof value.recordedAt === "string" ? value.recordedAt : new Date().toISOString(),
   }
 }
 

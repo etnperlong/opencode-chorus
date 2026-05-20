@@ -104,6 +104,20 @@ export type NotificationRuntimeRecord = {
   lastConnectedAt?: string
   lastReconnectAt?: string
   lastError?: string
+  lastScopeEvaluation?: {
+    notificationUuid: string
+    outcome: "in_scope" | "out_of_scope" | "unresolved"
+    source: "config" | "shared" | "session" | "unresolved"
+    reason:
+      | "project_allowed"
+      | "project_not_in_scope"
+      | "missing_notification_project"
+      | "multiple_session_projects"
+      | "missing_scope_context"
+    notificationProjectUuid?: string
+    scopeProjectUuids: string[]
+    recordedAt: string
+  }
 }
 
 export type OpenCodeState = {
@@ -127,6 +141,7 @@ export type OpenCodeState = {
   notificationQueue: QueuedNotification[]
   checkpoints: {
     lastUnreadBackfillAt?: string
+    lastNotificationCreatedAt?: string
     lastSharedSyncAt?: string
   }
 }

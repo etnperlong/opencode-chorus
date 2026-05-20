@@ -105,7 +105,12 @@ describe("plugin event hook", () => {
   it("uses the first session.updated event as a startup fallback once", async () => {
     const store = await createStore()
     const readySessions: string[] = []
-    const endedSessions: string[] = []
+    const endedSessions: Array<{ sessionId: string; trackedMainSession: boolean }> = []
+
+    await store.updateOpenCodeState((state) => ({
+      ...state,
+      mainSession: { runtimeSessionId: "runtime-updated", status: "active" },
+    }))
 
     const hook = createPluginEventHook({
       autoStart: true,
@@ -118,8 +123,8 @@ describe("plugin event hook", () => {
       onSessionReady: async (sessionId: string) => {
         readySessions.push(sessionId)
       },
-      onSessionEnded: async (sessionId: string) => {
-        endedSessions.push(sessionId)
+      onSessionEnded: async (sessionId: string, details) => {
+        endedSessions.push({ sessionId, trackedMainSession: details.trackedMainSession })
       },
     })
 
@@ -130,7 +135,7 @@ describe("plugin event hook", () => {
     expect(readySessions).toEqual(["runtime-updated"])
     // session deletion triggers onSessionEnded
     await hook({ event: { type: "session.deleted", properties: { info: { id: "runtime-updated" } } } })
-    expect(endedSessions).toEqual(["runtime-updated"])
+    expect(endedSessions).toEqual([{ sessionId: "runtime-updated", trackedMainSession: true }])
   })
 })
 

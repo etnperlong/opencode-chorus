@@ -62,7 +62,7 @@ export class SessionLifecycle {
     })
   }
 
-  async stop(runtimeSessionId: string): Promise<void> {
+  async stop(runtimeSessionId: string): Promise<boolean> {
     let stopped = false
     await this.stateStore.updateOpenCodeState((state) => {
       if (!isTrackedSessionEvent(state.mainSession.runtimeSessionId, runtimeSessionId)) return state
@@ -76,8 +76,9 @@ export class SessionLifecycle {
       }
     })
 
-    if (!stopped) return
+    if (!stopped) return false
     await this.chorusClient.disconnect()
     await this.stateStore.cleanupStagingDir()
+    return true
   }
 }

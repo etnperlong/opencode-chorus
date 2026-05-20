@@ -14,6 +14,8 @@ All notable changes to this project will be documented in this file.
 - Injected the staging directory absolute path into the agent's Chorus context summary so agents always know where to write document bodies for non-OpenSpec workflows.
 - Added `stagingDir` field to `ChorusPaths`, `ensureStagingDir()` and `cleanupStagingDir()` methods to `StateStore`, and a `stagingDir` option to `CreateChorusLazyBridgeToolsOptions`.
 - Added a `permission.ask` hook that auto-allows OpenCode `write` / `edit` permission requests targeting the Chorus staging directory, removing redundant prompts during document-upload workflows.
+- Added explicit notification project scoping through `projectUuids` / `CHORUS_PROJECT_UUIDS`, plus a `notification-scope` evaluator that records the last scope decision for runtime diagnostics.
+- Added regression coverage for notification project allowlists, unresolved-scope suppression, missing `projectUuid`, main-session handoff, queue continuity, and duplicate-delivery prevention.
 
 ### Changed
 
@@ -26,11 +28,17 @@ All notable changes to this project will be documented in this file.
 - Updated bundled skills (`chorus-proposal`, `chorus-yolo`, `chorus-review`, `chorus-develop`, `chorus-openspec`) to use `contentPath`-based document upload flows: non-OpenSpec skills write to the Chorus staging directory; `chorus-openspec` retains local OpenSpec artifact paths.
 - Updated `chorus/SKILL.md` execution rules and `README.md` to document the global path-only document upload contract, the staging directory lifecycle, and the two-mode usage (staging for free-form, artifact paths for OpenSpec).
 - Injected system-level guidance that tells agents to prefer OpenCode's native `write` / `edit` tools over bash-based file writes, especially when preparing `contentPath` uploads in the Chorus staging directory.
+- Changed notification intake to backfill from the full notification stream using `createdAt` checkpoints, so reconnect/startup catch-up stays aligned with listener restarts and avoids missing cross-session events.
+- Changed main-session handoff behavior so the notification listener stops with the tracked main session, restarts only after replacement-session readiness, and leaves queued assistant-turn notifications pending during the ownership gap.
+- Updated the README to document notification scoping rules, single-owner queue consumption, and the new multi-project safety model.
 
 ### Fixed
 
 - Adapted `chorus_checkin` parsing for Chorus v0.8 response shapes, including grouped permission matrices, nested `agent.owner`, and `ideaTracker` project summaries.
 - Removed the obsolete session file write/delete path that depended on removed `checkin.session.uuid` data.
+- Fixed multi-session / multi-project notification routing so out-of-scope notifications, unresolved scope, and notifications missing `projectUuid` no longer trigger automatic queue delivery, toasts, or assistant turns.
+- Fixed assistant-turn delivery ownership so only the tracked `mainSession.runtimeSessionId` can drain queued notifications, preventing duplicate or wrong-session delivery during session replacement.
+- Fixed SSE listener shutdown during reconnect backoff so disconnecting the listener cancels the pending reconnect wait promptly.
 
 ## v0.3.2 - 2026-05-05
 

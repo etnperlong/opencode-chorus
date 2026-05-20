@@ -107,4 +107,21 @@ describe("ChorusSseListener", () => {
     expect(fetchCalls).toBeGreaterThanOrEqual(2)
     expect(reconnectCalls).toBeGreaterThanOrEqual(1)
   })
+
+  it("disconnect cancels reconnect wait so the listener can stop promptly", async () => {
+    globalThis.fetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch
+
+    const listener = new ChorusSseListener("http://chorus.test", "key", () => {}, {
+      initialReconnectDelayMs: 1_000,
+      maxReconnectDelayMs: 1_000,
+    })
+
+    const startedAt = Date.now()
+    const connectPromise = listener.connect()
+    await Bun.sleep(20)
+    listener.disconnect()
+    await connectPromise
+
+    expect(Date.now() - startedAt).toBeLessThan(250)
+  })
 })

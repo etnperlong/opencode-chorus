@@ -67,6 +67,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
     chorusClient,
     stateStore,
     lazyBridge,
+    onReady: async () => {
+      await notificationCoordinator.start()
+    },
     tui,
     directory: ctx.directory,
     enableSessionContextSummary: config.enableSessionContextSummary,
@@ -78,6 +81,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
   const notificationCoordinator = new NotificationCoordinator({
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
+    projectUuids: config.projectUuids,
     autoStart: config.autoStart,
     enableNotificationHints: config.enableNotificationHints,
     directory: ctx.directory,
@@ -97,7 +101,8 @@ export const createPlugin: Plugin = async (ctx, options) => {
     onSessionIdle: async (sessionId) => {
       await notificationCoordinator.handleSessionIdle(sessionId)
     },
-    onSessionEnded: async (sessionId) => {
+    onSessionEnded: async (sessionId, details) => {
+      if (details.trackedMainSession) notificationCoordinator.stop()
       readiness.markSessionEnded(sessionId)
     },
   })

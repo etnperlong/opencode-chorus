@@ -1,19 +1,19 @@
 import { describe, expect, it } from "bun:test"
-import { fetchUnreadNotificationByUuid } from "../../src/notifications/notification-pagination"
+import { fetchNotificationByUuid } from "../../src/notifications/notification-pagination"
 
-describe("fetchUnreadNotificationByUuid", () => {
-  it("searches bounded unread notification pages until it finds the matching notification", async () => {
+describe("fetchNotificationByUuid", () => {
+  it("searches bounded all-notification pages until it finds the matching notification", async () => {
     const chorusClient = new FakeChorusClient([
       { notifications: [{ uuid: "other-1" }] },
-      { notifications: [{ uuid: "target", action: "task_assigned", entityUuid: "task-1" }] },
+      { notifications: [{ uuid: "target", action: "task_assigned", entityUuid: "task-1", readAt: "2026-01-01T00:00:00.000Z" }] },
     ])
 
-    const result = await fetchUnreadNotificationByUuid(chorusClient as never, "target")
+    const result = await fetchNotificationByUuid(chorusClient as never, "target")
 
     expect(result?.entityUuid).toBe("task-1")
     expect(chorusClient.args).toEqual([
-      { status: "unread", autoMarkRead: false, limit: 50, offset: 0 },
-      { status: "unread", autoMarkRead: false, limit: 50, offset: 50 },
+      { status: "all", autoMarkRead: false, limit: 50, offset: 0 },
+      { status: "all", autoMarkRead: false, limit: 50, offset: 50 },
     ])
   })
 })

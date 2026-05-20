@@ -68,6 +68,7 @@ Optional observability settings:
 export CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY="true"
 export CHORUS_ENABLE_NOTIFICATION_HINTS="true"
 export CHORUS_REVIEW_GATE_OUTPUT_MODE="summary" # summary or detailed
+export CHORUS_PROJECT_UUIDS="project-uuid-1,project-uuid-2"
 ```
 
 Optional state storage settings:
@@ -82,6 +83,7 @@ Alternatively, you can create a `chorus.json` file in your OpenCode configuratio
 ```json
 {
   "chorusUrl": "http://localhost:3000",
+  "projectUuids": ["project-uuid-1", "project-uuid-2"],
   "enableProposalReviewer": true,
   "enableTaskReviewer": true,
   "enableSessionContextSummary": true,
@@ -92,6 +94,13 @@ Alternatively, you can create a `chorus.json` file in your OpenCode configuratio
 }
 ```
 *Note: While you can put your API key in `chorus.json`, using the `CHORUS_API_KEY` environment variable is strongly recommended for security.*
+
+Notification project scoping:
+
+- `projectUuids` defines the explicit Chorus project allowlist for automatic notification delivery.
+- If one Chorus agent is used for more than one Chorus project, setting `projectUuids` is strongly recommended so the plugin does not rely on broad session context to decide which notifications belong to the current OpenCode workflow.
+- If you need automatic notification delivery to be restricted to one project or a known subset of projects, `projectUuids` is required.
+- If `projectUuids` is omitted, the plugin falls back to shared runtime project context and then to a single-project `sessionContext` inference. When it cannot prove a unique project scope, it safely suppresses active delivery instead of guessing.
 
 Observability behavior:
 

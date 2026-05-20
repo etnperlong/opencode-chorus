@@ -2,6 +2,7 @@ export type SseNotificationEvent = { type: string; notificationUuid?: string }
 export type SseListenerStatus = "connected" | "disconnected" | "reconnecting"
 
 type ChorusSseListenerOptions = {
+  onConnect?: () => Promise<void>
   onReconnect?: () => Promise<void>
   onStatusChange?: (status: SseListenerStatus, error?: string) => Promise<void> | void
   initialReconnectDelayMs?: number
@@ -42,6 +43,8 @@ export class ChorusSseListener {
   private abortController: AbortController | null = null
   private statusValue: SseListenerStatus = "disconnected"
   private connectPromise: Promise<void> | null = null
+  private reconnectDelayTimer: ReturnType<typeof setTimeout> | null = null
+  private reconnectDelayResolve: (() => void) | null = null
   private stopped = false
 
   constructor(
@@ -71,6 +74,7 @@ export class ChorusSseListener {
     this.stopped = true
     this.abortController?.abort()
     this.abortController = null
+    this.cancelReconnectDelay()
     void this.updateStatus("disconnected")
   }
 
@@ -101,6 +105,7 @@ export class ChorusSseListener {
         reconnectDelay = initialDelay
         connectedOnce = true
         if (wasReconnect) await this.options.onReconnect?.()
+        else await this.options.onConnect?.()
         await this.consume(reader)
 
         if (this.stopped) break
@@ -114,7 +119,7 @@ export class ChorusSseListener {
       }
 
       if (this.stopped) break
-      await delay(reconnectDelay)
+      await this.waitForReconnectDelay(reconnectDelay)
       reconnectDelay = Math.min(reconnectDelay * 2, maxDelay)
     }
 
@@ -142,6 +147,30 @@ export class ChorusSseListener {
     this.statusValue = status
     await this.options.onStatusChange?.(status, error)
   }
+
+  private waitForReconnectDelay(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.stopped) {
+        resolve()
+        return
+      }
+
+      this.reconnectDelayResolve = () => {
+        this.reconnectDelayResolve = null
+        if (this.reconnectDelayTimer) clearTimeout(this.reconnectDelayTimer)
+        this.reconnectDelayTimer = null
+        resolve()
+      }
+
+      this.reconnectDelayTimer = setTimeout(() => {
+        this.reconnectDelayResolve?.()
+      }, ms)
+    })
+  }
+
+  private cancelReconnectDelay(): void {
+    this.reconnectDelayResolve?.()
+  }
 }
 
 function parseNotificationEvent(data: string): SseNotificationEvent | null {
@@ -160,8 +189,4 @@ function isSseNotificationEvent(value: unknown): value is SseNotificationEvent {
     !Array.isArray(value) &&
     typeof (value as Record<string, unknown>).type === "string"
   )
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
 }

@@ -31,6 +31,7 @@ export type ChorusReadinessOptions = {
   chorusClient: ChorusReadinessClient
   stateStore: ChorusReadinessStateStore
   lazyBridge: ChorusReadinessBridge
+  onReady?: (sessionId: string) => Promise<void>
   tui?: ChorusReadinessTui
   directory: string
   enableSessionContextSummary?: boolean
@@ -118,6 +119,8 @@ export class ChorusReadiness {
           },
         }))
       }
+
+      await this.options.onReady?.(sessionId)
     } catch (error) {
       if (mode === "visible") {
         await this.showToast({

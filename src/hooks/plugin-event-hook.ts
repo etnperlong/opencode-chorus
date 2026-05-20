@@ -19,7 +19,7 @@ type CreatePluginEventHookOptions = {
   logger: Pick<Logger, "debug" | "info" | "warn">
   onSessionReady?: (sessionId: string) => Promise<void>
   onSessionIdle?: (sessionId: string) => Promise<void>
-  onSessionEnded?: (sessionId: string) => Promise<void>
+  onSessionEnded?: (sessionId: string, details: { trackedMainSession: boolean }) => Promise<void>
 }
 
 export function createPluginEventHook(options: CreatePluginEventHookOptions) {
@@ -52,8 +52,10 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
     if (event.type === "session.deleted") {
       const sessionId = extractSessionEventId(event)
       if (sessionId) {
+        const state = await options.stateStore.readOpenCodeState()
+        const trackedMainSession = state.mainSession.runtimeSessionId === sessionId
         await options.sessionLifecycle.stop(sessionId)
-        await options.onSessionEnded?.(sessionId)
+        await options.onSessionEnded?.(sessionId, { trackedMainSession })
       }
     }
   }

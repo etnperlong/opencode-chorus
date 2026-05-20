@@ -25,6 +25,8 @@ let previousChorusApiKey: string | undefined
 let previousXdgStateHome: string | undefined
 let listToolsCalls = 0
 let listToolsError: Error | undefined
+let listenerConnectCalls = 0
+let listenerDisconnectCalls = 0
 
 mock.module("../../src/chorus/mcp-client", () => ({
   ChorusMcpClient: class {
@@ -86,10 +88,12 @@ mock.module("../../src/notifications/sse-listener", () => ({
     }
 
     async connect() {
+      listenerConnectCalls += 1
       if (this.connectToSse) await this.listener.connect()
     }
 
     disconnect() {
+      listenerDisconnectCalls += 1
       this.listener.disconnect()
     }
   },
@@ -117,6 +121,8 @@ describe("plugin hooks", () => {
     sessionStatusResponse = {}
     listToolsCalls = 0
     listToolsError = undefined
+    listenerConnectCalls = 0
+    listenerDisconnectCalls = 0
     if (previousConfigDir === undefined) delete process.env.OPENCODE_CONFIG_DIR
     else process.env.OPENCODE_CONFIG_DIR = previousConfigDir
     if (previousChorusApiKey === undefined) delete process.env.CHORUS_API_KEY
@@ -1151,6 +1157,49 @@ describe("plugin hooks", () => {
 
       expect(listToolsCalls).toBe(1)
       expect(toastCalls.filter((t) => t.title === "Chorus connected")).toHaveLength(1)
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("restarts the notification listener only after replacement main-session readiness", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      expect(listenerConnectCalls).toBe(1)
+      expect(listenerDisconnectCalls).toBe(0)
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-old" } } } } as never)
+      await plugin["chat.params"]?.(
+        { sessionID: "session-old", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
+
+      expect(listenerConnectCalls).toBe(1)
+
+      await plugin.event?.({ event: { type: "session.deleted", properties: { info: { id: "session-old" } } } } as never)
+
+      expect(listenerDisconnectCalls).toBe(1)
+      expect(listenerConnectCalls).toBe(1)
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-new" } } } } as never)
+      await plugin.event?.({ event: { type: "session.idle", properties: { info: { id: "session-new" } } } } as never)
+
+      expect(listenerConnectCalls).toBe(1)
+      expect(listenerDisconnectCalls).toBe(1)
+
+      await plugin["chat.params"]?.(
+        { sessionID: "session-new", agent: "chorus", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
+
+      expect(listenerConnectCalls).toBe(2)
+      expect(listenerDisconnectCalls).toBe(1)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
