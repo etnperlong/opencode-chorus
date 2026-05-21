@@ -3,7 +3,7 @@ import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontex
 import { createChorusMcpHeaders, resolveChorusMcpUrl, type ChorusMcpScope } from "./mcp-config"
 import type { ChorusToolTextContent, McpClientStatus } from "./types"
 
-type ChorusMcpClientOptions = {
+export type ChorusMcpClientOptions = {
   chorusUrl: string
   apiKey: string
 }

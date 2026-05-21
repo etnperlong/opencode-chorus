@@ -17,7 +17,8 @@ import {
   type ChorusNotification,
 } from "./notification-pagination"
 import { routeNotification } from "./notification-router"
-import { ChorusSseListener, type SseListenerStatus, type SseNotificationEvent } from "./sse-listener"
+import { createChorusSseListener } from "./sse-listener-factory"
+import type { ChorusSseListener, SseListenerStatus, SseNotificationEvent } from "./sse-listener"
 
 type Logger = {
   debug(message: string, extra?: Record<string, unknown>): Promise<void>
@@ -50,7 +51,7 @@ export class NotificationCoordinator {
     if (this.started) return
     this.started = true
     const initialCursor = await this.readLatestNotificationCreatedAt()
-    this.listener = new ChorusSseListener(this.options.chorusUrl, this.options.apiKey, (event) => {
+    this.listener = createChorusSseListener(this.options.chorusUrl, this.options.apiKey, (event) => {
       void this.handleSseEvent(event).catch((error) =>
         this.options.logger.error("Failed to process Chorus notification event", {
           error: error instanceof Error ? error.message : String(error),

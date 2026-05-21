@@ -1,5 +1,5 @@
 import type { Plugin } from "@opencode-ai/plugin"
-import { ChorusMcpClient } from "./chorus/mcp-client"
+import { createChorusMcpClient } from "./chorus/mcp-client-factory"
 import { loadChorusConfig } from "./config/config-loader"
 import { isMissingRequiredConfigError } from "./config/error-guards"
 import { createPluginConfigApplier } from "./config/plugin-config"
@@ -41,7 +41,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     globalStateRoot: config.globalStateRoot,
   })
   await stateStore.init()
-  const chorusClient = new ChorusMcpClient({
+  const chorusClient = createChorusMcpClient({
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
   })

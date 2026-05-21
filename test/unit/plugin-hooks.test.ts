@@ -1,21 +1,12 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "bun:test"
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { restorePluginHookMocks, setPluginHookMockRuntime } from "./plugin-hooks-mocks"
+import { createPlugin } from "../../src/index"
 import { resolveStatePaths } from "../../src/state/paths"
 import { StateStore } from "../../src/state/state-store"
-// Capture real values before mock.module() replaces these modules for plugin hooks.
-const {
-  parseToolResult: realParseToolResult,
-  isRetryableMcpSessionError: realIsRetryableMcpSessionError,
-} = await import("../../src/chorus/mcp-client")
-const {
-  ChorusSseListener: RealChorusSseListener,
-  parseSseNotificationChunk,
-} = await import("../../src/notifications/sse-listener")
-type RealChorusSseListenerArgs = ConstructorParameters<typeof RealChorusSseListener>
-type RealChorusSseListenerInstance = InstanceType<typeof RealChorusSseListener>
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const sessionCalls: Array<{ name: string; args: Record<string, unknown> }> = []
 const logCalls: Array<{ level: string; message?: string; extra?: Record<string, unknown> }> = []
@@ -35,87 +26,63 @@ let checkinError: Error | undefined
 let listenerConnectCalls = 0
 let listenerDisconnectCalls = 0
 
-mock.module("../../src/chorus/mcp-client", () => ({
-  parseToolResult: realParseToolResult,
-  isRetryableMcpSessionError: realIsRetryableMcpSessionError,
-  ChorusMcpClient: class {
-    async listTools() {
-      listToolsCalls += 1
-      if (listToolsError) throw listToolsError
-      return [
-        {
-          name: "chorus_checkin",
-          description: "Check in to Chorus",
-          inputSchema: { type: "object", properties: {} },
+setPluginHookMockRuntime({
+  async listTools() {
+    listToolsCalls += 1
+    if (listToolsError) throw listToolsError
+    return [
+      {
+        name: "chorus_checkin",
+        description: "Check in to Chorus",
+        inputSchema: { type: "object", properties: {} },
+      },
+    ]
+  },
+
+  async callTool(name: string, args: Record<string, unknown> = {}) {
+    toolCalls.push({ name, args })
+    if (name === "chorus_checkin") {
+      if (checkinError) throw checkinError
+      return {
+        agent: {
+          uuid: "agent-1",
+          name: "OpenCode",
+          permissions: { task: ["read", "write"] },
+          owner: { uuid: "user-1", name: "etnperlong" },
         },
-      ]
-    }
-
-    async callTool(name: string, args: Record<string, unknown> = {}) {
-      toolCalls.push({ name, args })
-      if (name === "chorus_checkin") {
-        if (checkinError) throw checkinError
-        return {
-          agent: {
-            uuid: "agent-1",
-            name: "OpenCode",
-            permissions: { task: ["read", "write"] },
-            owner: { uuid: "user-1", name: "etnperlong" },
+        ideaTracker: {
+          "project-1": {
+            name: "OpenCode-Chorus",
+            ideas: [{ taskCount: 2, pendingProposalCount: 1 }],
           },
-          ideaTracker: {
-            "project-1": {
-              name: "OpenCode-Chorus",
-              ideas: [{ taskCount: 2, pendingProposalCount: 1 }],
-            },
-          },
-          notifications: [{ uuid: "notification-1" }],
-        }
+        },
+        notifications: [{ uuid: "notification-1" }],
       }
-      if (name === "chorus_get_comments") return getCommentsResponse
-      if (name === "chorus_get_proposal") return getProposalResponse
-      if (name === "chorus_get_task") return getTaskResponse
-      return {}
     }
-
-    async disconnect() {}
+    if (name === "chorus_get_comments") return getCommentsResponse
+    if (name === "chorus_get_proposal") return getProposalResponse
+    if (name === "chorus_get_task") return getTaskResponse
+    return {}
   },
-}))
 
-mock.module("../../src/notifications/sse-listener", () => ({
-  parseSseNotificationChunk,
-  ChorusSseListener: class {
-    private readonly listener: RealChorusSseListenerInstance
-    private readonly connectToSse: boolean
+  async disconnectMcp() {},
 
-    constructor(...args: RealChorusSseListenerArgs) {
-      this.listener = new RealChorusSseListener(...args)
-      const options = args[3] ?? {}
-      // Plugin hook tests use default SSE options and should not start a background fetch.
-      // Direct SSE tests set short reconnect delays, so delegate to the real listener there.
-      this.connectToSse = options.initialReconnectDelayMs !== undefined || options.maxReconnectDelayMs !== undefined
-    }
-
-    get status() {
-      return this.listener.status
-    }
-
-    async connect() {
-      listenerConnectCalls += 1
-      if (this.connectToSse) await this.listener.connect()
-    }
-
-    disconnect() {
-      listenerDisconnectCalls += 1
-      this.listener.disconnect()
-    }
+  getSseStatus() {
+    return "disconnected"
   },
-}))
 
-const { createPlugin } = await import("../../src/index")
+  async connectSse() {
+    listenerConnectCalls += 1
+  },
+
+  disconnectSse() {
+    listenerDisconnectCalls += 1
+  },
+})
 
 // Restore all module mocks after this file so subsequent test files (e.g. mcp-client.test.ts)
 // receive the real module implementations instead of these plugin-scoped mocks.
-afterAll(() => mock.restore())
+afterAll(() => restorePluginHookMocks())
 
 describe("plugin hooks", () => {
   beforeEach(async () => {
@@ -1370,12 +1337,6 @@ describe("plugin hooks", () => {
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
-  })
-
-  afterAll(() => {
-    // Clean up for later files in the same worker; concurrent direct SSE tests
-    // are protected by the compatible mock above.
-    mock.restore()
   })
 })
 
