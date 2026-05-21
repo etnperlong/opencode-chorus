@@ -1,8 +1,9 @@
 import { describe, expect, it } from "bun:test"
-import { mkdtemp, writeFile, mkdir } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { SharedState } from "../../src/state/state-types"
+import { StateStore } from "../../src/state/state-store"
 import { createChorusLazyBridge, createChorusLazyBridgeTools, rewriteDocumentArgs } from "../../src/tools/lazy-bridge-tools"
 
 describe("Chorus lazy bridge tools", () => {
@@ -366,6 +367,90 @@ describe("Chorus lazy bridge tools", () => {
       message: "Removed binding to OpenCode-Chorus (project-1)",
       variant: "info",
     })
+  })
+
+  it("shows shared workspace context with a real StateStore instance", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "chorus-project-"))
+    const globalRoot = await mkdtemp(join(tmpdir(), "chorus-global-"))
+
+    try {
+      const stateStore = new StateStore({ projectRoot, stateMode: "global", globalStateRoot: globalRoot })
+      await stateStore.updateSharedState((state) => ({
+        ...state,
+        context: { ...state.context, projectUuid: "project-1", projectName: "OpenCode-Chorus" },
+      }))
+
+      const tools = createChorusLazyBridgeTools({
+        chorusClient: createClient(),
+        stateStore,
+      })
+
+      const result = await tools.chorus_workspace_context!.execute({ action: "show" }, createToolContext("chorus"))
+
+      expect(readOutput(result)).toContain('"status": "ok"')
+      expect(readOutput(result)).toContain('"projectUuid": "project-1"')
+      expect(readOutput(result)).toContain('"projectName": "OpenCode-Chorus"')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+      await rm(globalRoot, { recursive: true, force: true })
+    }
+  })
+
+  it("binds and unbinds workspace context with a real StateStore instance", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "chorus-project-"))
+    const globalRoot = await mkdtemp(join(tmpdir(), "chorus-global-"))
+    const toasts: Array<{ title?: string; message?: string; variant?: string }> = []
+
+    try {
+      const stateStore = new StateStore({ projectRoot, stateMode: "global", globalStateRoot: globalRoot })
+      await stateStore.updateOpenCodeState((state) => ({
+        ...state,
+        sessionContext: {
+          source: "chorus_checkin",
+          runtimeSessionId: "session-1",
+          lastRefreshedAt: "2026-01-01T00:00:00.000Z",
+          projects: [{ uuid: "project-1", name: "OpenCode-Chorus" }],
+        },
+      }))
+
+      const tools = createChorusLazyBridgeTools({
+        chorusClient: createClient(),
+        stateStore,
+        tui: {
+          showToast: async (input: { title?: string; message?: string; variant?: string }) => {
+            toasts.push(input)
+          },
+        },
+      })
+
+      const bindResult = await tools.chorus_workspace_context!.execute(
+        { action: "bind_project", projectUuid: "project-1" },
+        createToolContext("chorus"),
+      )
+      const boundState = await stateStore.readSharedState()
+
+      expect(readOutput(bindResult)).toContain('"status": "bound"')
+      expect(boundState.context).toEqual({ projectUuid: "project-1", projectName: "OpenCode-Chorus" })
+
+      const unbindResult = await tools.chorus_workspace_context!.execute({ action: "unbind_project" }, createToolContext("chorus"))
+      const unboundState = await stateStore.readSharedState()
+
+      expect(readOutput(unbindResult)).toContain('"status": "unbound"')
+      expect(unboundState.context).toEqual({})
+      expect(toasts).toContainEqual({
+        title: "Chorus workspace bound",
+        message: "Bound to OpenCode-Chorus (project-1)",
+        variant: "success",
+      })
+      expect(toasts).toContainEqual({
+        title: "Chorus workspace unbound",
+        message: "Removed binding to OpenCode-Chorus (project-1)",
+        variant: "info",
+      })
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+      await rm(globalRoot, { recursive: true, force: true })
+    }
   })
 
   it("removes accidental empty title and description from chorus_update_task", async () => {

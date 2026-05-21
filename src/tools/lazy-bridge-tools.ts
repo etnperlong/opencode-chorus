@@ -235,14 +235,7 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
 
     chorus_workspace_context: createWorkspaceContextTool({
       chorusClient: options.chorusClient,
-      stateStore:
-        options.stateStore?.readSharedState && options.stateStore.updateSharedState
-          ? {
-              readOpenCodeState: options.stateStore.readOpenCodeState,
-              readSharedState: options.stateStore.readSharedState as () => Promise<SharedState>,
-              updateSharedState: options.stateStore.updateSharedState,
-            }
-          : undefined,
+      stateStore: hasWorkspaceContextStateStore(options.stateStore) ? options.stateStore : undefined,
       tui: options.tui,
     }),
   }
@@ -262,6 +255,15 @@ async function triggerSilentReadinessIfNeeded(
 
 export function createChorusLazyBridgeTools(options: CreateChorusLazyBridgeToolsOptions): Record<string, ToolDefinition> {
   return createChorusLazyBridge(options).tools
+}
+
+function hasWorkspaceContextStateStore(
+  stateStore: CreateChorusLazyBridgeToolsOptions["stateStore"],
+): stateStore is NonNullable<CreateChorusLazyBridgeToolsOptions["stateStore"]> & {
+  readSharedState(): Promise<SharedState>
+  updateSharedState(updater: (state: SharedState) => SharedState): Promise<SharedState>
+} {
+  return typeof stateStore?.readSharedState === "function" && typeof stateStore.updateSharedState === "function"
 }
 
 async function recordLazyBridgeStatus(
