@@ -113,6 +113,10 @@ mock.module("../../src/notifications/sse-listener", () => ({
 
 const { createPlugin } = await import("../../src/index")
 
+// Restore all module mocks after this file so subsequent test files (e.g. mcp-client.test.ts)
+// receive the real module implementations instead of these plugin-scoped mocks.
+afterAll(() => mock.restore())
+
 describe("plugin hooks", () => {
   beforeEach(async () => {
     configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
