@@ -1100,7 +1100,12 @@ describe("plugin hooks", () => {
       expect(plugin["tool.execute.after"]).toBeFunction()
       expect(plugin["experimental.chat.system.transform"]).toBeFunction()
       expect(plugin["chat.params"]).toBeFunction()
-      expect(Object.keys(plugin.tool ?? {}).sort()).toEqual(["chorus_tool_execute", "chorus_tool_get", "chorus_tools"])
+      expect(Object.keys(plugin.tool ?? {}).sort()).toEqual([
+        "chorus_tool_execute",
+        "chorus_tool_get",
+        "chorus_tools",
+        "chorus_workspace_context",
+      ])
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

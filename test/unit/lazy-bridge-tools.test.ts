@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import { mkdtemp, writeFile, mkdir } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { SharedState } from "../../src/state/state-types"
 import { createChorusLazyBridge, createChorusLazyBridgeTools, rewriteDocumentArgs } from "../../src/tools/lazy-bridge-tools"
 
 describe("Chorus lazy bridge tools", () => {
@@ -271,6 +272,99 @@ describe("Chorus lazy bridge tools", () => {
       name: "chorus_get_task",
       args: { taskUuid: "task-1" },
       scope: { projectUuid: "project-1" },
+    })
+  })
+
+  it("binds workspace context to a Chorus project and shows a project-name toast", async () => {
+    let sharedState: SharedState = { version: 1, context: {}, orphanHints: [] }
+    const toasts: Array<{ title?: string; message?: string; variant?: string }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: {
+        async listTools() {
+          return createToolDefinitions()
+        },
+        async callTool<T>(name: string, args: Record<string, unknown>): Promise<T> {
+          if (name === "chorus_get_project" && args.projectUuid === "project-1") {
+            return { uuid: "project-1", name: "OpenCode-Chorus" } as T
+          }
+          return { ok: true } as T
+        },
+      },
+      stateStore: {
+        async updateOpenCodeState(updater: (state: Record<string, unknown>) => Record<string, unknown>) {
+          return updater({})
+        },
+        async readSharedState() {
+          return sharedState
+        },
+        async updateSharedState(updater) {
+          sharedState = updater(sharedState)
+          return sharedState
+        },
+      },
+      tui: {
+        showToast: async (input: { title?: string; message?: string; variant?: string }) => {
+          toasts.push(input)
+        },
+      },
+    })
+
+    const result = await tools.chorus_workspace_context!.execute(
+      { action: "bind_project", projectUuid: "project-1" },
+      createToolContext("chorus"),
+    )
+
+    expect(sharedState.context).toEqual({ projectUuid: "project-1", projectName: "OpenCode-Chorus" })
+    expect(readOutput(result)).toContain('"status": "bound"')
+    expect(toasts).toContainEqual({
+      title: "Chorus workspace bound",
+      message: "Bound to OpenCode-Chorus (project-1)",
+      variant: "success",
+    })
+  })
+
+  it("unbinds workspace project context and shows a toast", async () => {
+    let sharedState: SharedState = {
+      version: 1,
+      context: {
+        projectUuid: "project-1",
+        projectName: "OpenCode-Chorus",
+        ideaUuid: "idea-1",
+        proposalUuid: "proposal-1",
+        taskUuid: "task-1",
+      },
+      orphanHints: [],
+    }
+    const toasts: Array<{ title?: string; message?: string; variant?: string }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+      stateStore: {
+        async updateOpenCodeState(updater: (state: Record<string, unknown>) => Record<string, unknown>) {
+          return updater({})
+        },
+        async readSharedState() {
+          return sharedState
+        },
+        async updateSharedState(updater) {
+          sharedState = updater(sharedState)
+          return sharedState
+        },
+      },
+      tui: {
+        showToast: async (input: { title?: string; message?: string; variant?: string }) => {
+          toasts.push(input)
+        },
+      },
+    })
+
+    const result = await tools.chorus_workspace_context!.execute({ action: "unbind_project" }, createToolContext("chorus"))
+
+    expect(sharedState.context).toEqual({})
+    expect(readOutput(result)).toContain('"status": "unbound"')
+    expect(toasts).toContainEqual({
+      title: "Chorus workspace unbound",
+      message: "Removed binding to OpenCode-Chorus (project-1)",
+      variant: "info",
     })
   })
 

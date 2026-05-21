@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { CHORUS_SKILL_FIRST_GUIDANCE, createSystemTransformHook } from "../../src/hooks/system-transform-hook"
+import { PREFER_NATIVE_FILE_TOOLS_GUIDANCE } from "../../src/util/staging-guidance"
 
 describe("system transform hook", () => {
   it("always injects native file tool guidance", async () => {
@@ -9,10 +10,54 @@ describe("system transform hook", () => {
     await hook({} as never, output as never)
 
     expect(output.system).toContain("existing")
-    expect(output.system).toContain(
-      "Prefer OpenCode's native `write` and `edit` tools when creating or updating local files. Avoid bash-based file writes such as `cat >`, `echo >`, shell heredocs, or `tee` unless no native file tool can perform the edit.",
-    )
+    expect(output.system).toContain(PREFER_NATIVE_FILE_TOOLS_GUIDANCE)
     expect(output.system).toContain(CHORUS_SKILL_FIRST_GUIDANCE)
+  })
+
+  it("does not duplicate Chorus guidance when invoked more than once", async () => {
+    const hook = createSystemTransformHook({ stagingDir: "/chorus/staging", isOpenSpecAvailable: async () => false })
+    const output = { system: [] as string[] }
+
+    await hook({} as never, output as never)
+    await hook({} as never, output as never)
+
+    expect(output.system.filter((line) => line === PREFER_NATIVE_FILE_TOOLS_GUIDANCE)).toHaveLength(1)
+    expect(output.system.filter((line) => line === CHORUS_SKILL_FIRST_GUIDANCE)).toHaveLength(1)
+    expect(output.system.filter((line) => line.startsWith("Chorus Context:"))).toHaveLength(1)
+    expect(output.system.filter((line) => line.includes("/chorus/staging"))).toHaveLength(1)
+  })
+
+  it("hydrates session context before rendering Chorus context", async () => {
+    let hydrated = false
+    const hook = createSystemTransformHook({
+      stateStore: {
+        readOpenCodeState: async () => ({
+          ...(hydrated
+            ? {
+                sessionContext: {
+                  source: "chorus_checkin" as const,
+                  runtimeSessionId: "session-1",
+                  lastRefreshedAt: "2026-01-01T00:00:00.000Z",
+                  projects: [{ uuid: "project-1", name: "OpenCode-Chorus" }],
+                },
+              }
+            : {}),
+        }),
+        readSharedState: async () => ({ context: {} }),
+      },
+      ensureSessionContext: async (sessionId: string) => {
+        expect(sessionId).toBe("session-1")
+        hydrated = true
+      },
+      isOpenSpecAvailable: async () => false,
+    })
+    const output = { system: [] as string[] }
+
+    await hook({ sessionID: "session-1" } as never, output as never)
+
+    const rendered = output.system.join("\n")
+    expect(rendered).toContain("Chorus project scope: managed")
+    expect(rendered).toContain("Project: OpenCode-Chorus (project-1)")
   })
 
   it("injects staging directory guidance when available", async () => {
@@ -75,6 +120,23 @@ describe("system transform hook", () => {
     expect(rendered).toContain("Chorus project scope: unmanaged")
     expect(rendered).toContain("do not assume projectUuid")
     expect(rendered).not.toContain("Project: undefined")
+  })
+
+  it("injects managed Chorus context from persisted shared workspace binding", async () => {
+    const hook = createSystemTransformHook({
+      stateStore: {
+        readOpenCodeState: async () => ({}),
+        readSharedState: async () => ({ context: { projectUuid: "project-1", projectName: "OpenCode-Chorus" } }),
+      },
+      isOpenSpecAvailable: async () => false,
+    })
+    const output = { system: [] as string[] }
+
+    await hook({ sessionID: "session-1" } as never, output as never)
+
+    const rendered = output.system.join("\n")
+    expect(rendered).toContain("Chorus project scope: managed")
+    expect(rendered).toContain("Project: OpenCode-Chorus (project-1)")
   })
 
   it("reports ambiguous scope for multiple cached session projects", async () => {

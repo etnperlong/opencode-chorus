@@ -182,6 +182,9 @@ export type SharedState = {
   lastUpdatedAt?: string
   context: {
     projectUuid?: string
+    projectName?: string
+    projectGroupUuid?: string
+    projectGroupName?: string
     ideaUuid?: string
     proposalUuid?: string
     taskUuid?: string

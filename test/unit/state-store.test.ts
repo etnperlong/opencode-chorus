@@ -248,6 +248,26 @@ describe("StateStore", () => {
     expect(state.mainSession.runtimeSessionId).toBeUndefined()
   })
 
+  it("persists shared workspace context in global state", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "chorus-project-"))
+    const globalRoot = await mkdtemp(join(tmpdir(), "chorus-global-"))
+    const first = new StateStore({ projectRoot, stateMode: "global", globalStateRoot: globalRoot })
+
+    await first.updateSharedState((state) => ({
+      ...state,
+      context: { ...state.context, projectUuid: "project-1", projectName: "OpenCode-Chorus" },
+    }))
+
+    const raw = JSON.parse(await readFile(first.paths.sharedFile, "utf8"))
+    const second = new StateStore({ projectRoot, stateMode: "global", globalStateRoot: globalRoot })
+    const shared = await second.readSharedState()
+
+    expect(raw.context.projectUuid).toBe("project-1")
+    expect(raw.context.projectName).toBe("OpenCode-Chorus")
+    expect(shared.context.projectUuid).toBe("project-1")
+    expect(shared.context.projectName).toBe("OpenCode-Chorus")
+  })
+
   it("migrates legacy project state to global storage and cleans known files", async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "chorus-project-"))
     const globalRoot = await mkdtemp(join(tmpdir(), "chorus-global-"))

@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Added regression coverage for notification project allowlists, unresolved-scope suppression, missing `projectUuid`, main-session handoff, queue continuity, and duplicate-delivery prevention.
 - Added bounded native-agent `Chorus Context` injection from cached runtime state, including managed, unmanaged, and ambiguous project-scope guidance plus owner, permission, and OpenSpec availability summaries.
 - Added reviewer TUI toast notifications that show target names, review rounds, completion verdicts, and aggregate multiple concurrently running reviewers without exposing reviewer session IDs.
+- Added `chorus_workspace_context`, a local-only tool for explicitly binding or unbinding the current workspace to a Chorus project UUID with TUI toast confirmation.
 
 ### Changed
 
@@ -44,6 +45,7 @@ All notable changes to this project will be documented in this file.
 - Fixed assistant-turn delivery ownership so only the tracked `mainSession.runtimeSessionId` can drain queued notifications, preventing duplicate or wrong-session delivery during session replacement.
 - Fixed SSE listener shutdown during reconnect backoff so disconnecting the listener cancels the pending reconnect wait promptly.
 - Fixed native bridge compatibility after removing the dedicated agent by keeping reviewer silent-readiness behavior limited to `proposal-reviewer` and `task-reviewer` while allowing normal native agents to call `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` directly.
+- Fixed global-mode shared workspace context persistence so project bindings are written under the `projectKey` state directory and reused by later sessions.
 
 ## v0.3.2 - 2026-05-05
 

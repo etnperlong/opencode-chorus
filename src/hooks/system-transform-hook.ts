@@ -11,7 +11,7 @@ import {
 } from "../util/staging-guidance"
 
 export const CHORUS_SKILL_FIRST_GUIDANCE =
-  "When using Chorus in this workspace, load the narrowest Chorus skill for workflow details, use `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` to discover remote tools, and avoid relying on duplicated long-form workflow manuals in system prompts."
+  "When using Chorus in this workspace, load the narrowest Chorus skill for workflow details, use `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` to discover remote tools, use `chorus_workspace_context` only when the user explicitly asks to bind or unbind workspace context, and avoid relying on duplicated long-form workflow manuals in system prompts."
 
 type SystemTransformInput = {
   sessionID?: string
@@ -23,7 +23,7 @@ type SystemTransformOutput = {
 
 type SystemTransformStateStore = {
   readOpenCodeState(): Promise<{ sessionContext?: SessionContextRecord }>
-  readSharedState?(): Promise<{ context?: { projectUuid?: string; projectGroupUuid?: string } }>
+  readSharedState?(): Promise<{ context?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string } }>
 }
 
 type CreateSystemTransformHookOptions = {
@@ -31,6 +31,7 @@ type CreateSystemTransformHookOptions = {
   stateStore?: SystemTransformStateStore
   projectUuids?: string[]
   directory?: string
+  ensureSessionContext?: (sessionID: string) => Promise<void>
   isOpenSpecAvailable?: () => Promise<boolean>
 }
 
@@ -64,14 +65,33 @@ export function createSystemTransformHook(options: CreateSystemTransformHookOpti
   }
 
   return async (input: SystemTransformInput, output: SystemTransformOutput): Promise<void> => {
-    output.system.push(PREFER_NATIVE_FILE_TOOLS_GUIDANCE)
-    output.system.push(CHORUS_SKILL_FIRST_GUIDANCE)
+    await ensureSessionContextSafe(input.sessionID, options.ensureSessionContext)
+
+    pushSystemMessageOnce(output, PREFER_NATIVE_FILE_TOOLS_GUIDANCE)
+    pushSystemMessageOnce(output, CHORUS_SKILL_FIRST_GUIDANCE)
 
     const chorusContext = await buildChorusSystemContext(input, options, readOpenSpecAvailability)
-    if (chorusContext) output.system.push(chorusContext)
+    if (chorusContext) pushSystemMessageOnce(output, chorusContext)
 
-    if (options.stagingDir) output.system.push(formatStagingDirSystemGuidance(options.stagingDir))
+    if (options.stagingDir) pushSystemMessageOnce(output, formatStagingDirSystemGuidance(options.stagingDir))
   }
+}
+
+async function ensureSessionContextSafe(
+  sessionID: string | undefined,
+  ensureSessionContext: ((sessionID: string) => Promise<void>) | undefined,
+): Promise<void> {
+  if (!sessionID || !ensureSessionContext) return
+  try {
+    await ensureSessionContext(sessionID)
+  } catch {
+    // System guidance is best-effort; fall back to whatever state is already cached.
+  }
+}
+
+function pushSystemMessageOnce(output: SystemTransformOutput, message: string): void {
+  if (output.system.includes(message)) return
+  output.system.push(message)
 }
 
 async function buildChorusSystemContext(
@@ -130,7 +150,7 @@ async function buildChorusSystemContext(
 
 function resolveProjectScope(options: {
   configuredProjectUuids: string[]
-  sharedContext?: { projectUuid?: string; projectGroupUuid?: string }
+  sharedContext?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string }
   sessionContext?: SessionContextRecord
 }): ProjectScope {
   const configuredProjectUuids = options.configuredProjectUuids.filter(Boolean)
@@ -144,7 +164,7 @@ function resolveProjectScope(options: {
 
   if (options.sharedContext?.projectUuid) {
     const projectUuid = options.sharedContext.projectUuid
-    const projectName = sessionProjects.find((project) => project.uuid === projectUuid)?.name
+    const projectName = sessionProjects.find((project) => project.uuid === projectUuid)?.name ?? options.sharedContext.projectName
     return { kind: "managed", source: "shared", projectUuid, ...(projectName ? { projectName } : {}) }
   }
 
@@ -188,7 +208,7 @@ async function readOpenCodeStateSafe(stateStore: SystemTransformStateStore | und
 
 async function readSharedStateSafe(
   stateStore: SystemTransformStateStore | undefined,
-): Promise<{ context?: { projectUuid?: string; projectGroupUuid?: string } } | undefined> {
+): Promise<{ context?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string } } | undefined> {
   if (!stateStore?.readSharedState) return undefined
   try {
     return await stateStore.readSharedState()

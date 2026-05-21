@@ -135,15 +135,24 @@ export class StateStore {
   }
 
   async updateSharedState(updater: (state: SharedState) => SharedState): Promise<SharedState> {
-    if (this.paths.mode === "global") return updater(createDefaultSharedState())
-    return this.enqueue(async () => {
-      return this.withLock("shared-state", async () => {
+    return this.enqueue(() => this.runSharedStateUpdate(updater, true))
+  }
+
+  private async runSharedStateUpdate(updater: (state: SharedState) => SharedState, allowFallback: boolean): Promise<SharedState> {
+    try {
+      return await this.withLock("shared-state", async () => {
         const current = await this.readSharedState()
         const next = updater(current)
         await this.atomicWrite(this.paths.sharedFile, JSON.stringify(next, null, 2))
         return next
       })
-    })
+    } catch (error) {
+      if (allowFallback && this.paths.mode === "global" && isStorageError(error)) {
+        await this.fallbackToProjectLocal(error)
+        return this.runSharedStateUpdate(updater, false)
+      }
+      throw error
+    }
   }
 
   private enqueue<T>(job: () => Promise<T>): Promise<T> {

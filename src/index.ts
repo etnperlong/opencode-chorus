@@ -132,6 +132,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     projectUuids: config.projectUuids,
     directory: ctx.directory,
     stagingDir: stateStore.paths.stagingDir,
+    ensureSessionContext: (sessionID) => sessionLifecycle.start(sessionID),
   })
   if (loadedConfig.metadata.apiKeySource === "chorus.json") {
     await logger.warn("Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.")

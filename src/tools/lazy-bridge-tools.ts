@@ -3,6 +3,8 @@ import path from "node:path"
 import { tool, type ToolDefinition, type ToolResult } from "@opencode-ai/plugin"
 import type { ChorusMcpToolDefinition } from "../chorus/mcp-client"
 import { resolveChorusToolScope, type ChorusToolScope } from "../chorus/tool-scope"
+import type { SessionContextRecord, SharedState } from "../state/state-types"
+import { createWorkspaceContextTool } from "./workspace-context-tool"
 
 // Tools that replace agent-visible `content` with `contentPath` at the bridge boundary.
 const MANAGED_DOCUMENT_TOOLS = new Set([
@@ -25,8 +27,10 @@ const CHORUS_SILENT_AGENTS = new Set(["proposal-reviewer", "task-reviewer"])
 type CreateChorusLazyBridgeToolsOptions = {
   chorusClient: ChorusLazyBridgeClient
   stateStore?: {
+    readOpenCodeState?(): Promise<{ sessionContext?: SessionContextRecord }>
     updateOpenCodeState(updater: (state: Record<string, unknown>) => Record<string, unknown>): Promise<unknown>
-    readSharedState?(): Promise<{ context?: { projectUuid?: string; projectGroupUuid?: string } }>
+    readSharedState?(): Promise<{ context?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string } }>
+    updateSharedState?(updater: (state: SharedState) => SharedState): Promise<SharedState>
   }
   tui?: {
     showToast(input: { title?: string; message?: string; variant?: "info" | "success" | "warning" | "error"; duration?: number }): Promise<unknown>
@@ -227,6 +231,19 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
           chorusToolName: toolName,
         })
       },
+    }),
+
+    chorus_workspace_context: createWorkspaceContextTool({
+      chorusClient: options.chorusClient,
+      stateStore:
+        options.stateStore?.readSharedState && options.stateStore.updateSharedState
+          ? {
+              readOpenCodeState: options.stateStore.readOpenCodeState,
+              readSharedState: options.stateStore.readSharedState as () => Promise<SharedState>,
+              updateSharedState: options.stateStore.updateSharedState,
+            }
+          : undefined,
+      tui: options.tui,
     }),
   }
 
