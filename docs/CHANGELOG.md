@@ -4,48 +4,47 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.4.0 - 2026-05-21
+
 ### Added
 
-- Added `chorus-openspec` bundled skill for OpenSpec-aware proposal authoring, document draft mirroring, document update guidance, and archive reminders.
-- Added TypeScript OpenSpec environment detection helpers for `openspec/` directory and `openspec` CLI availability checks.
-- Added `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` as **path-managed document tools** in the lazy Chorus bridge. Agents pass a `contentPath` file path; the bridge reads the file and injects its content as the real remote `content` field before forwarding the call.
-- Added a per-project **Chorus document staging directory** (`<globalStateRoot>/<projectKey>/staging/`) that is created when a session starts and deleted when it ends. Staging files live outside the workspace, keeping the project clean and avoiding a second source of truth alongside Chorus.
-- Injected the staging directory absolute path into the agent's Chorus context summary so agents always know where to write document bodies for non-OpenSpec workflows.
-- Added `stagingDir` field to `ChorusPaths`, `ensureStagingDir()` and `cleanupStagingDir()` methods to `StateStore`, and a `stagingDir` option to `CreateChorusLazyBridgeToolsOptions`.
-- Added a `permission.ask` hook that auto-allows OpenCode `write` / `edit` permission requests targeting the Chorus staging directory, removing redundant prompts during document-upload workflows.
-- Added explicit notification project scoping through `projectUuids` / `CHORUS_PROJECT_UUIDS`, plus a `notification-scope` evaluator that records the last scope decision for runtime diagnostics.
-- Added regression coverage for notification project allowlists, unresolved-scope suppression, missing `projectUuid`, main-session handoff, queue continuity, and duplicate-delivery prevention.
-- Added bounded native-agent `Chorus Context` injection from cached runtime state, including managed, unmanaged, and ambiguous project-scope guidance plus owner, permission, and OpenSpec availability summaries.
-- Added reviewer TUI toast notifications that show target names, review rounds, completion verdicts, and aggregate multiple concurrently running reviewers without exposing reviewer session IDs.
+- Added Chorus SSE notification coordination with project scoping, queue continuity, checkpointed backfill, main-session handoff, duplicate-delivery prevention, reconnect shutdown handling, and runtime scope diagnostics.
+- Added `projectUuids` / `CHORUS_PROJECT_UUIDS` notification allowlists so multi-project workspaces can suppress out-of-scope notification delivery.
+- Added `chorus-openspec` bundled skill and OpenSpec environment detection helpers for `openspec/` directory and `openspec` CLI availability checks.
+- Added path-managed document uploads for `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document`: agents pass `contentPath`, and the lazy bridge reads the file before forwarding the remote Chorus call.
+- Added per-project Chorus document staging directories under global state, including staging lifecycle cleanup, `ChorusPaths.stagingDir`, `StateStore.ensureStagingDir()`, `StateStore.cleanupStagingDir()`, `CreateChorusLazyBridgeToolsOptions.stagingDir`, and staging-path context guidance.
+- Added a `permission.ask` hook that auto-allows OpenCode `write` and `edit` permission requests targeting the Chorus staging directory.
+- Added bounded native-agent `Chorus Context` injection from cached runtime state, including managed, unmanaged, and ambiguous project-scope guidance plus owner, permission, and OpenSpec summaries.
+- Added reviewer TUI toast notifications that show target names, review rounds, completion verdicts, and aggregate concurrent reviewers without exposing reviewer session IDs.
 - Added `chorus_workspace_context`, a local-only tool for explicitly binding or unbinding the current workspace to a Chorus project UUID with TUI toast confirmation.
 
 ### Changed
 
-- Updated bundled Chorus skills to upstream skill metadata version `0.8.3` and documented the Chorus v0.8 permission matrix and role presets.
-- Expanded proposal and task reviewer prompts with stronger review procedures, anti-rubber-stamp guidance, hallucination checks, adversarial probes, and structured output templates.
-- Increased reviewer sub-agent step budgets to 40 for proposal reviews and 50 for task reviews.
-- Updated proposal, develop, and yolo workflow skills with OpenSpec-aware branching and document sync guidance.
-- `chorus_tool_get` now returns a bridge-local schema overlay for the four managed document tools: `contentPath` replaces `content`, with `contentPath` required for `chorus_pm_add_document_draft` and optional for the other three.
-- `chorus_tool_execute` rejects inline `content` for managed document tools with an explicit error, and validates that `contentPath` resolves to a readable file inside the workspace or the Chorus staging directory.
-- Updated bundled skills (`chorus-proposal`, `chorus-yolo`, `chorus-review`, `chorus-develop`, `chorus-openspec`) to use `contentPath`-based document upload flows: non-OpenSpec skills write to the Chorus staging directory; `chorus-openspec` retains local OpenSpec artifact paths.
-- Updated `chorus/SKILL.md` execution rules and `README.md` to document the global path-only document upload contract, the staging directory lifecycle, and the two-mode usage (staging for free-form, artifact paths for OpenSpec).
-- Injected system-level guidance that tells agents to prefer OpenCode's native `write` / `edit` tools over bash-based file writes, especially when preparing `contentPath` uploads in the Chorus staging directory.
-- Changed notification intake to backfill from the full notification stream using `createdAt` checkpoints, so reconnect/startup catch-up stays aligned with listener restarts and avoids missing cross-session events.
-- Changed main-session handoff behavior so the notification listener stops with the tracked main session, restarts only after replacement-session readiness, and leaves queued assistant-turn notifications pending during the ownership gap.
-- Updated the README to document notification scoping rules, single-owner queue consumption, and the new multi-project safety model.
-- Removed the dedicated bundled `chorus` agent and its prompt resource; native OpenCode agents now load Chorus skills directly and use the lazy bridge tools without an agent allow-list.
+- Moved fresh OpenCode/Chorus state to global storage by default, kept `stateMode: "project"` for project-local state, and retained legacy `.chorus` migration support.
+- Updated bundled Chorus skills to upstream skill metadata version `0.8.3` and documented the Chorus v0.8 permission matrix, role presets, OpenSpec-aware branching, and document sync guidance.
+- Expanded proposal and task reviewer agents with stronger review procedures, anti-rubber-stamp guidance, hallucination checks, adversarial probes, structured output templates, and higher step budgets.
+- Deferred Chorus readiness until runtime startup/resume can hydrate cached context for native agents.
+- Changed notification intake and main-session handoff so listener restarts, startup catch-up, queued assistant-turn notifications, and ownership gaps are handled consistently.
+- Removed the dedicated bundled `chorus` agent and prompt resource; native OpenCode agents now load Chorus skills directly and use `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` without an agent allow-list.
 - Moved fresh session-context hydration onto native `chat.params` startup/resume flow so cached Chorus context remains available after the dedicated agent removal.
-- Updated the system transform and README to prefer skill-first native workflows, explain direct native-agent bridge access, and document managed versus unmanaged versus ambiguous Chorus project context behavior.
+- Updated the system transform to prefer skill-first native workflows, explain direct native-agent bridge access, and describe managed versus unmanaged Chorus project context behavior.
 
 ### Fixed
 
-- Adapted `chorus_checkin` parsing for Chorus v0.8 response shapes, including grouped permission matrices, nested `agent.owner`, and `ideaTracker` project summaries.
-- Removed the obsolete session file write/delete path that depended on removed `checkin.session.uuid` data.
-- Fixed multi-session / multi-project notification routing so out-of-scope notifications, unresolved scope, and notifications missing `projectUuid` no longer trigger automatic queue delivery, toasts, or assistant turns.
-- Fixed assistant-turn delivery ownership so only the tracked `mainSession.runtimeSessionId` can drain queued notifications, preventing duplicate or wrong-session delivery during session replacement.
-- Fixed SSE listener shutdown during reconnect backoff so disconnecting the listener cancels the pending reconnect wait promptly.
-- Fixed native bridge compatibility after removing the dedicated agent by keeping reviewer silent-readiness behavior limited to `proposal-reviewer` and `task-reviewer` while allowing normal native agents to call `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` directly.
+- Fixed `chorus_tool_execute` argument handling by removing the unused `argumentPolicy` path and normalizing arguments consistently before remote execution.
+- Fixed Chorus state initialization so state files are created lazily instead of requiring eager session-file setup.
+- Fixed task reviewer verification gates by allowing read-only bash checks without child-session permission deadlocks.
+- Adapted session context parsing for Chorus v0.8 response shapes, including grouped permission matrices, nested `agent.owner`, and `ideaTracker` project summaries.
+- Fixed multi-session and multi-project notification routing so out-of-scope, unresolved-scope, and missing-`projectUuid` notifications do not trigger queue delivery, toasts, or assistant turns.
+- Fixed native bridge compatibility after the dedicated-agent removal by keeping reviewer silent-readiness behavior limited to `proposal-reviewer` and `task-reviewer` while allowing normal native agents to call the lazy bridge tools directly.
 - Fixed global-mode shared workspace context persistence so project bindings are written under the `projectKey` state directory and reused by later sessions.
+- Fixed plugin hook test isolation and TypeScript configuration so module mocks do not pollute cross-file `ChorusMcpClient` behavior.
+
+### Documentation
+
+- Rewrote `README.md` with the v0.4.0 workflow, native-agent bridge usage, notification scoping rules, single-owner queue consumption, and managed versus unmanaged Chorus project context.
+- Added `docs/CONFIGURATION.md`, `docs/COMPONENTS.md`, `CONTRIBUTING.md`, and `AGENTS.md`.
+- Moved the changelog to `docs/CHANGELOG.md`.
 
 ## v0.3.2 - 2026-05-05
 
