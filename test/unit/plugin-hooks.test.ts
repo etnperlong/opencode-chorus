@@ -5,7 +5,11 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { resolveStatePaths } from "../../src/state/paths"
 import { StateStore } from "../../src/state/state-store"
-// Capture real values before mock.module() replaces this module for plugin hooks.
+// Capture real values before mock.module() replaces these modules for plugin hooks.
+const {
+  parseToolResult: realParseToolResult,
+  isRetryableMcpSessionError: realIsRetryableMcpSessionError,
+} = await import("../../src/chorus/mcp-client")
 const {
   ChorusSseListener: RealChorusSseListener,
   parseSseNotificationChunk,
@@ -32,6 +36,8 @@ let listenerConnectCalls = 0
 let listenerDisconnectCalls = 0
 
 mock.module("../../src/chorus/mcp-client", () => ({
+  parseToolResult: realParseToolResult,
+  isRetryableMcpSessionError: realIsRetryableMcpSessionError,
   ChorusMcpClient: class {
     async listTools() {
       listToolsCalls += 1
