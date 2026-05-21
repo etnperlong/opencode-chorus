@@ -1,46 +1,46 @@
+<div align="center">
+
+<img src="images/banner.webp" alt="opencode-chorus" width="100%" />
+
 # opencode-chorus
 
-The [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for OpenCode. 
+> The [Chorus](https://github.com/Chorus-AIDLC/Chorus) integration plugin for [OpenCode](https://opencode.ai)
 
-This plugin connects OpenCode to your Chorus instance, letting you manage proposals, execute tasks, and run the AI-DLC pipeline.
+[![Version](https://img.shields.io/badge/Version-v0.3.2-blue?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/opencode-chorus)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge&logo=open-source-initiative&logoColor=white)](./LICENSE)
+[![With & For OpenCode](https://img.shields.io/badge/With_%26_For-OpenCode-000000?style=for-the-badge&labelColor=555555&logo=data:image/svg%2bxml;base64,PHN2ZyB3aWR0aD0nMjQwJyBoZWlnaHQ9JzMwMCcgdmlld0JveD0nMCAwIDI0MCAzMDAnIGZpbGw9J25vbmUnIHhtbG5zPSdodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Zyc+PGcgY2xpcC1wYXRoPSd1cmwoI2NsaXAwXzE0MDFfODYyODMpJz48bWFzayBpZD0nbWFzazBfMTQwMV84NjI4Mycgc3R5bGU9J21hc2stdHlwZTpsdW1pbmFuY2UnIG1hc2tVbml0cz0ndXNlclNwYWNlT25Vc2UnIHg9JzAnIHk9JzAnIHdpZHRoPScyNDAnIGhlaWdodD0nMzAwJz48cGF0aCBkPSdNMjQwIDBIMFYzMDBIMjQwVjBaJyBmaWxsPSd3aGl0ZScvPjwvbWFzaz48ZyBtYXNrPSd1cmwoI21hc2swXzE0MDFfODYyODMpJz48cGF0aCBkPSdNMTgwIDI0MEg2MFYxMjBIMTgwVjI0MFonIGZpbGw9JyM0QjQ2NDYnLz48cGF0aCBkPSdNMTgwIDYwSDYwVjI0MEgxODBWNjBaTTI0MCAzMDBIMFYwSDI0MFYzMDBaJyBmaWxsPScjRjFFQ0VDJy8+PC9nPjwvZz48ZGVmcz48Y2xpcFBhdGggaWQ9J2NsaXAwXzE0MDFfODYyODMnPjxyZWN0IHdpZHRoPScyNDAnIGhlaWdodD0nMzAwJyBmaWxsPSd3aGl0ZScvPjwvY2xpcFBhdGg+PC9kZWZzPjwvc3ZnPg==&logoColor=white)](https://opencode.ai)
 
-Current plugin release: `v0.3.1`. This release is compatible with the Chorus `v0.7.0` permission model.
+</div>
 
-## Changelog
+---
 
-Release notes are tracked in [CHANGELOG.md](./CHANGELOG.md).
+## What Is This?
+
+[**Chorus**](https://github.com/Chorus-AIDLC/Chorus) is an agent harness for AI-Human collaboration, inspired by the [AI-Driven Development Lifecycle (AI-DLC)](https://aws.amazon.com/blogs/devops/ai-driven-development-life-cycle/) methodology. It manages session lifecycle, task state, sub-agent orchestration, observability, and failure recovery — letting multiple AI agents and humans collaborate through the full workflow from requirements to delivery.
+
+**opencode-chorus** is the community-maintained plugin that connects [OpenCode](https://opencode.ai) to your Chorus instance. It loads Chorus workflow skills, exposes a lazy MCP tool bridge, and provides lifecycle hooks and reviewer automation — all without manual tool or skill configuration.
 
 ## Features
 
-When enabled, `opencode-chorus` loads Chorus workflow skills and exposes a lazy Chorus tool bridge inside OpenCode. You don't need to configure tools or link skill directories manually.
-
-The plugin provides lifecycle hooks, 7 workflow skills, and 2 review agents for the AI-DLC process. It no longer registers a dedicated `chorus` Agent inside OpenCode. Instead, native OpenCode agents load Chorus skills as needed and call Chorus through the lazy bridge tools.
-
-### Components
-
-| Feature Category | Components | Description |
+| Category | Components | Description |
 |---|---|---|
-| **Lifecycle Hooks** | State Management | Keeps reviewer state and notification delivery data in OpenCode's per-user state directory. |
-| | Lazy MCP Bridge | Exposes `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`, then discovers real Chorus tools from the Chorus MCP server on demand. |
-| **Review Agents** | Proposal Reviewer | Automated review agent that evaluates proposals and waits for verdicts. |
-| | Task Reviewer | Automated review agent that verifies completed tasks. |
-| **Workflow Skills** | `chorus` | The entry-point skill. Platform overview, shared tools, and lifecycle rules for native OpenCode agents. |
-| | `chorus-idea` | Claim ideas, elaborate on requirements, and confirm with owners. |
-| | `chorus-proposal` | Draft PRDs, tech designs, and task dependency graphs. |
-| | `chorus-develop` | Implement tasks, report work, and run self-checks before verification. |
-| | `chorus-quick-dev` | Handle small changes and hotfixes with optional self-verification. |
-| | `chorus-review` | Handle reviewer verdicts, governance, and verification states. |
-| | `chorus-yolo` | Execute the full-auto AI-DLC pipeline from prompt to completion. |
+| **Lifecycle Hooks** | State Management, Lazy MCP Bridge, Context Injection, Notification Coordination | Manages state, discovers Chorus tools on demand, injects project context, and routes notifications. |
+| **Review Agents** | Proposal Reviewer, Task Reviewer | Automated reviewers that evaluate proposals and verify completed tasks with structured verdicts. |
+| **Workflow Skills** | 8 bundled skills covering the full AI-DLC pipeline | `chorus`, `chorus-idea`, `chorus-proposal`, `chorus-develop`, `chorus-quick-dev`, `chorus-review`, `chorus-yolo`, `chorus-openspec` |
 
-> **Note**: A local or online Chorus instance must be running and accessible to use this plugin.
+> [!NOTE]
+> A local or online Chorus instance must be running and accessible to use this plugin. See [Chorus Quick Start](https://github.com/Chorus-AIDLC/Chorus#quick-start) to get one running.
 
-## Getting Started
+For detailed component descriptions, see [docs/COMPONENTS.md](./docs/COMPONENTS.md).
+
+## Quick Start
+
+> [!TIP]
+> This plugin is already included in the [Chorus upstream onboarding flow](https://github.com/Chorus-AIDLC/Chorus#connect-ai-agents). If you followed the Chorus setup guide for OpenCode, you can skip to step 2.
 
 ### 1. Install the Plugin
 
-Install `opencode-chorus` from npm by adding it to your OpenCode configuration.
-
-Edit your OpenCode config file (usually `~/.config/opencode/config.json`) to include the plugin:
+Add `opencode-chorus` to your OpenCode config file (usually `~/.config/opencode/config.json`):
 
 ```json
 {
@@ -51,116 +51,36 @@ Edit your OpenCode config file (usually `~/.config/opencode/config.json`) to inc
 
 ### 2. Configure Credentials
 
-The plugin needs to know where your Chorus server is and how to authenticate. The easiest way to configure this is using environment variables.
-
-The Chorus API key should include the permissions required by the workflows you plan to run. For example, read-only overview and search flows need `task:read`, task execution needs `task:write`, proposal work needs `proposal:write`, idea elaboration needs `idea:write`, and verification or governance flows need `task:admin`.
-
-Set these in your terminal before running OpenCode:
-
-```bash
-export CHORUS_BASE_URL="http://localhost:3000" # Replace with your Chorus server URL
-export CHORUS_API_KEY="your-chorus-api-key"
-```
-
-Optional observability settings:
-
-```bash
-export CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY="true"
-export CHORUS_ENABLE_NOTIFICATION_HINTS="true"
-export CHORUS_REVIEW_GATE_OUTPUT_MODE="summary" # summary or detailed
-export CHORUS_PROJECT_UUIDS="project-uuid-1,project-uuid-2"
-```
-
-Optional state storage settings:
-
-```bash
-export CHORUS_STATE_MODE="global" # global or project
-export CHORUS_GLOBAL_STATE_ROOT="/custom/opencode/chorus/state"
-```
-
-Alternatively, you can create a `chorus.json` file in your OpenCode configuration directory (`~/.config/opencode/chorus.json`):
+Create a `chorus.json` in your OpenCode config directory (`~/.config/opencode/chorus.json`) with the minimal configuration:
 
 ```json
 {
   "chorusUrl": "http://localhost:3000",
-  "projectUuids": ["project-uuid-1", "project-uuid-2"],
-  "enableProposalReviewer": true,
-  "enableTaskReviewer": true,
-  "enableSessionContextSummary": true,
-  "enableNotificationHints": true,
-  "reviewGateOutputMode": "summary",
-  "stateMode": "global",
-  "globalStateRoot": "/custom/opencode/chorus/state"
+  "apiKey": "your-chorus-api-key"
 }
 ```
-*Note: While you can put your API key in `chorus.json`, using the `CHORUS_API_KEY` environment variable is strongly recommended for security.*
 
-Notification project scoping:
+Or use environment variables:
 
-- `projectUuids` defines the explicit Chorus project allowlist for automatic notification delivery.
-- If one Chorus agent is used for more than one Chorus project, setting `projectUuids` is strongly recommended so the plugin does not rely on broad session context to decide which notifications belong to the current OpenCode workflow.
-- If you need automatic notification delivery to be restricted to one project or a known subset of projects, `projectUuids` is required.
-- If `projectUuids` is omitted, the plugin falls back to shared runtime project context and then to a single-project `sessionContext` inference. When it cannot prove a unique project scope, it safely suppresses active delivery instead of guessing.
-
-Observability behavior:
-
-- `enableSessionContextSummary` controls one concise startup/resume Chorus context summary. When disabled, context remains runtime-only and no proactive summary is shown.
-- `enableNotificationHints` controls actionable text on routed notification queue entries. When disabled, supported notifications are still queued without hint text.
-- `reviewGateOutputMode` controls reviewer gate output verbosity. `summary` keeps output concise; `detailed` includes expanded reviewer job, round, target, comment, timeout, escalation, and verdict details.
-
-These settings only control visibility and hints. They do not auto-claim tasks, approve proposals, or verify tasks.
-
-State storage behavior:
-
-- `stateMode` defaults to `global`, which stores OpenCode-owned Chorus state outside the project workspace.
-- Linux uses `${XDG_STATE_HOME}/opencode/chorus` when `XDG_STATE_HOME` is set, otherwise `~/.local/state/opencode/chorus`.
-- macOS uses `~/Library/Application Support/OpenCode/Chorus`.
-- Windows uses `%LOCALAPPDATA%\OpenCode\Chorus`, with `%APPDATA%` or a home-directory fallback only if `LOCALAPPDATA` is unavailable.
-- Each project gets a stable `<basename>-<hash>` directory derived from OpenCode's canonical `ctx.directory`; `ctx.worktree` is stored as diagnostic metadata when available.
-- The persisted file keeps only reviewer state, notification queue data, and project metadata. Session context, lazy bridge status, notification connection status, planning scopes, workers, and checkpoints are runtime-only.
-- On first startup, an existing `.chorus/opencode-state.json` is migrated into the global store if the target global state file does not already exist. Only still-supported persisted fields are imported.
-- After successful migration, known plugin-owned legacy files such as `.chorus/opencode-state.json`, `.chorus/shared.json`, and `.chorus/sessions/main.json` are cleaned up. Unknown files are preserved.
-- To temporarily roll back to project-local storage, set `CHORUS_STATE_MODE=project` or `"stateMode": "project"`. In project mode, `stateDir` is honored and defaults to `.chorus`.
-- `stateDir` is deprecated for default global storage and is ignored unless project-local mode is explicitly selected.
-
-### Lazy Chorus Tools
-
-The plugin no longer injects a remote `mcp.chorus` server into OpenCode by default. Instead, it exposes three native bridge tools:
-
-- `chorus_tools` lists all Chorus tool names exposed by the remote Chorus MCP server.
-- `chorus_tool_get` returns the description for one Chorus tool.
-- `chorus_tool_execute` executes a real Chorus tool by name after applying the plugin's argument-safety policy.
-
-For example, to update a task status, first call `chorus_tools`, then inspect `chorus_update_task` with `chorus_tool_get`, then execute it through the bridge. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
-
-### Native Agent Workflow
-
-- The dedicated `chorus` Agent has been removed.
-- Use OpenCode's native agent for Chorus work, then load the right bundled skill for the stage you are in: `chorus` for overview, `chorus-idea` for ideas, `chorus-proposal` for proposal drafting, `chorus-develop` or `chorus-quick-dev` for implementation, `chorus-review` for governance, and `chorus-yolo` for full automation.
-- Native agents can call `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` directly. The plugin still reserves the specialized `proposal-reviewer` and `task-reviewer` child agents for reviewer gates.
-
-### Managed Project Context
-
-At session start or resume, the plugin injects a bounded `Chorus Context` summary into the native agent's system prompt using cached runtime state. This keeps project routing guidance available without requiring a dedicated Chorus agent or an extra network call during prompt construction.
-
-- `managed`: the plugin can confidently identify the active Chorus project and includes the project name and UUID.
-- `unmanaged`: no single Chorus project can be proven, so the injected context explicitly warns the agent not to assume a `projectUuid`.
-- `ambiguous`: multiple Chorus projects may apply, so the injected context reports the candidate count and avoids guessing.
-
-When available, the same injected context also includes owner metadata, permission scope, OpenSpec availability, and the Chorus staging directory guidance used by path-based document uploads.
-
-#### Document Body Uploads Are Path-Only
-
-The four managed document write tools — `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` — require a `contentPath` parameter instead of inline `content`.
-
-**For non-OpenSpec workflows**, write the document body to a file in the Chorus staging directory and pass its absolute path via `contentPath`. The plugin injects the staging directory path at session start (in the Chorus context summary). The bridge reads the file and injects its content into the remote Chorus call. Staging files are outside the workspace and are deleted automatically when the session ends. The plugin also auto-allows write/edit permission requests that target this staging directory, and its injected instructions tell agents to prefer OpenCode's native `write`/`edit` tools over bash-based file writes.
-
-**For OpenSpec workflows** (`chorus-openspec`), pass the local OpenSpec artifact path (e.g., `openspec/changes/<slug>/proposal.md`) directly.
-
-Passing inline `content` to any of these tools returns a local error and stops the call before it reaches the Chorus server. Paths outside the workspace root and the Chorus staging directory are also rejected.
+```bash
+export CHORUS_BASE_URL="http://localhost:3000"
+export CHORUS_API_KEY="your-chorus-api-key"
+```
 
 ### 3. Restart OpenCode
 
-After installing the plugin and setting your credentials, restart OpenCode.
+After installing and configuring, restart OpenCode. You will see the bundled Chorus skills in your workspace. Load the `chorus` skill to get started.
 
-You will see the bundled Chorus skills in your workspace. Start by asking OpenCode to load the `chorus` skill to inspect available permissions and route into the right workflow, or load a specific stage skill such as `chorus-idea`, `chorus-develop`, or `chorus-yolo`.
+For all configuration options (environment variables, `chorus.json` fields, state storage, observability settings), see [docs/CONFIGURATION.md](./docs/CONFIGURATION.md).
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [Configuration](./docs/CONFIGURATION.md) | Full configuration reference — env vars, `chorus.json`, state storage, observability |
+| [Components](./docs/COMPONENTS.md) | Detailed descriptions of lifecycle hooks, review agents, and workflow skills |
+| [Changelog](./docs/CHANGELOG.md) | Release history and migration notes |
+
+## License
+
+[AGPL-3.0](./LICENSE)
