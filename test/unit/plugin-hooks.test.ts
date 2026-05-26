@@ -907,7 +907,7 @@ describe("plugin hooks", () => {
       expect(taskReviewer).toBeDefined()
       expect(proposalReviewer).toMatchObject({
         mode: "subagent",
-        maxSteps: 40,
+        maxSteps: 100,
         permission: {
           edit: "deny",
           bash: "deny",
@@ -916,7 +916,7 @@ describe("plugin hooks", () => {
       expect(proposalReviewer?.prompt).toContain("Hard stop rule")
       expect(taskReviewer).toMatchObject({
         mode: "subagent",
-        maxSteps: 50,
+        maxSteps: 100,
         permission: {
           edit: "deny",
           bash: "allow",

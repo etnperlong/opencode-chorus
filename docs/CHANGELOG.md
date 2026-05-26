@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.5.0 - 2026-05-26
+
+### Added
+
+- Added the `chorus-brainstorm` bundled skill as an OpenCode-adapted prelude for fuzzy idea exploration before structured Chorus elaboration.
+- Added post-`chorus_admin_verify_task` idea-completion report reminders that prompt `chorus_create_report` only when an idea-rooted proposal is fully done and still has no report document.
+
+### Changed
+
+- Updated bundled Chorus skills to upstream skill metadata version `0.9.0` and aligned the local OpenCode guidance with Chorus `v0.9.0` workflows.
+- Expanded core, idea, develop, and yolo skill guidance to cover brainstorm routing, `chorus_create_report`, `report` documents, and the simplified `active | closed` session lifecycle semantics.
+- Replaced stale proposal skill examples that referenced removed MCP tools with `chorus_create_tasks` and `chorus_update_task({ addDependsOn/removeDependsOn })`.
+- Raised proposal and task reviewer agent step budgets to `100` to match the upstream Claude Code plugin review envelope.
+
+### Fixed
+
+- Removed stale bundled-skill references to deleted Chorus MCP tools `chorus_pm_create_tasks`, `chorus_add_task_dependency`, and `chorus_remove_task_dependency`.
+- Removed outdated session guidance that still described `inactive` sessions or `expiresAt`-style lifecycle behavior after the upstream `v0.9.0` session model simplification.
+
 ## v0.4.0 - 2026-05-21
 
 ### Added

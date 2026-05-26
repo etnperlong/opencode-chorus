@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.8.3"
+  version: "0.9.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: openspec-aware
@@ -33,7 +33,7 @@ At session start or before creating a proposal, detect whether OpenSpec mode is 
 
 1. Confirm the project root contains `openspec/`.
 2. Confirm the `openspec` CLI is available by running `openspec --version` or another harmless read-only OpenSpec command.
-3. If either check fails, use the normal `chorus-proposal` workflow and add document drafts inline.
+3. If either check fails, use the normal `chorus-proposal` workflow and follow its staging-directory plus `contentPath` document flow.
 4. If both checks pass, use this OpenSpec-aware workflow.
 
 OpenSpec mode is opt-in per repository. Do not create an `openspec/` directory unless the user explicitly asks to adopt OpenSpec.

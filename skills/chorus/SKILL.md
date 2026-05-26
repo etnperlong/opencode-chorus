@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.8.3"
+  version: "0.9.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: overview
@@ -152,20 +152,28 @@ Projects can be organized into **Project Groups** — a single-level grouping th
 
 | Tool | Purpose |
 |------|---------|
-| `chorus_get_ideas` | List project Ideas (filterable by status, paginated) |
-| `chorus_get_idea` | Get a single Idea's details |
+| `chorus_get_ideas` | List project Ideas (filterable by status, paginated; rows include `reportCount`) |
+| `chorus_get_idea` | Get a single Idea's details (includes `reports[]` with full content) |
 | `chorus_get_available_ideas` | Get claimable Ideas (status=open) |
 
 ### Documents
 
 | Tool | Purpose |
 |------|---------|
-| `chorus_get_documents` | List project documents (filterable by type: prd, tech_design, adr, spec, guide) |
+| `chorus_get_documents` | List project documents (filterable by type: prd, tech_design, adr, spec, guide, report) |
 | `chorus_get_document` | Get a single document's content |
 
 > **Document body uploads are path-only.** The four managed document write tools — `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document` — require a `contentPath` parameter instead of inline `content`. For non-OpenSpec workflows, write the document body to a file in the Chorus staging directory (injected at session start) and pass its absolute path via `contentPath`. Use OpenCode's native `write` / `edit` tools for these files instead of bash-based file writes whenever possible. The bridge reads the file and forwards its content to Chorus. Passing inline `content` to these tools returns an error.
 
 **Staging directory:** The plugin injects the Chorus document staging directory path at session start (visible in your context summary). Files written there are outside the project workspace and are automatically deleted when the session ends. Use this directory for all free-form document content — it keeps the project clean and avoids creating a second source of truth alongside Chorus. The plugin auto-allows write/edit permission requests that target this directory.
+
+### Reports
+
+A **report** is a short idea-completion summary persisted as a `type="report"` Document at end-of-Idea, authored via `chorus_create_report` (gated on `document:write`). The tool description carries the Summary / Decisions / Follow-ups template.
+
+- `chorus-yolo` treats the report as mandatory at the end of a successful full-auto run.
+- `chorus-develop` should suggest it when the last task of an Idea is finishing.
+- The plugin may remind you after `chorus_admin_verify_task` if a proposal is fully done and still has no report.
 
 ### Proposals
 
@@ -306,7 +314,7 @@ Restart OpenCode after changing `opencode.json`, `chorus.json`, or related envir
 ### 3. Verify Connection
 
 ```
-chorus_tool_execute({ toolName: "checkin", arguments: {} })
+chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 ```
 
 If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode restarted?
@@ -371,7 +379,8 @@ Chorus integrations share lifecycle concepts, but runtime wiring differs. For Op
 10. **Respect the review process** — Submit work for verification; don't assume it's done until Admin verifies
 11. **Always use OpenCode question tool for human interaction** — NEVER display questions as plain text; use interactive radio buttons
 12. **Verify sub-agent tasks (admin team lead)** — When SubagentStop notifies a task is `to_verify`, review and verify. Tasks in `to_verify` do NOT unblock downstream — only `done` does.
-13. **Document body uploads are path-only** — For `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document`, write the document body to a file in the Chorus staging directory (injected at session start) and pass its absolute path via `contentPath`. Prefer OpenCode's native `write` / `edit` tools over bash-based file writes, and never use inline `content` for these tools.
+13. **Document body uploads are path-only for long-form docs** — For `chorus_pm_add_document_draft`, `chorus_pm_update_document_draft`, `chorus_pm_create_document`, and `chorus_pm_update_document`, write the document body to a file in the Chorus staging directory (injected at session start) and pass its absolute path via `contentPath`. Prefer OpenCode's native `write` / `edit` tools over bash-based file writes, and never use inline `content` for these tools.
+14. **Idea-completion reports stay direct** — `chorus_create_report` is the short-form exception: call it directly and follow the tool description for the required sections.
 
 ---
 
@@ -411,6 +420,7 @@ This is the core overview skill. For stage-specific workflows, use:
 |-------|-------|-------------|
 | **Full Auto** | `chorus-yolo` | Full-auto AI-DLC pipeline — from prompt to done. Automates Idea → Proposal → Execute → Verify with adversarial reviewers |
 | **Quick Dev** | `chorus-quick-dev` | Skip Idea→Proposal, create tasks directly, execute, and verify |
+| **Brainstorm** | `chorus-brainstorm` | Optional divergent-then-convergent prelude for fuzzy ideas before structured elaboration |
 | **openspec-aware** | `chorus-openspec` | OpenSpec-backed proposal authoring, document mirror sync, and archive reminders |
 | **Ideation** | `chorus-idea` | Claim Ideas, run elaboration rounds, prepare for proposal |
 | **Planning** | `chorus-proposal` | Create Proposals with document & task drafts, manage dependency DAG, submit for review |

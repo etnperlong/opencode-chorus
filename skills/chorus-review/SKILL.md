@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.8.3"
+  version: "0.9.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: review

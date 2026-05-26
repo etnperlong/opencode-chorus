@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.8.3"
+  version: "0.9.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: full-auto
@@ -496,6 +496,7 @@ After all waves complete, output a markdown summary:
 **Project:** <project-name> (<project-uuid>)
 **Proposal:** <proposal-title> (<proposal-uuid>)
 **Idea:** <idea-title> (<idea-uuid>)
+**Report:** <report-document-uuid>
 
 ### Tasks
 | Task | Status | Review Rounds |
@@ -510,6 +511,10 @@ After all waves complete, output a markdown summary:
 - Escalated: Y (need human review)
 - Waves executed: W
 ```
+
+### Phase 5b: Idea Completion Report (mandatory)
+
+A successful `chorus-yolo` run finishes the Idea workflow. After the last proposal/task verification succeeds, call `chorus_create_report` once with the relevant `proposalUuid`. Follow the tool description for the Summary / Decisions / Follow-ups template, and surface the returned `documentUuid` in the final Phase 5 summary.
 
 ---
 

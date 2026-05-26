@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.8.3"
+  version: "0.9.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: ideation
@@ -125,6 +125,37 @@ Before elaborating, understand the full picture:
    ```
    chorus_get_comments({ targetType: "idea", targetUuid: "<idea-uuid>" })
    ```
+
+### Step 4.5: Brainstorm Mode (Optional Prelude)
+
+If the idea is still fuzzy and you cannot yet write good structured elaboration questions, offer the user an explicit brainstorm prelude before Step 5.
+
+Use the OpenCode `question` tool once:
+
+```
+question({
+  questions: [
+    {
+      header: "Brainstorm",
+      question: "Should we explore directions first, or go straight to structured elaboration?",
+      options: [
+        { label: "Already clear (Recommended)", description: "Skip brainstorming and write structured elaboration questions now" },
+        { label: "Brainstorm first", description: "Explore options before committing to structured questions" }
+      ]
+    }
+  ]
+})
+```
+
+- If the user chooses **Already clear**, continue to Step 5.
+- If the user chooses **Brainstorm first**, load `chorus-brainstorm` and follow it.
+
+When `chorus-brainstorm` returns, you own the lifecycle decision:
+
+- if the synthesized round already covers the open decisions, call `chorus_pm_validate_elaboration` with `issues: []` to resolve elaboration;
+- if important gaps remain, call `chorus_pm_validate_elaboration` with `issues` and `followUpQuestions` to open a structured follow-up round.
+
+Either outcome ends the brainstorm prelude; skip directly to validation behavior rather than re-running the full Step 5 flow from scratch.
 
 ### Step 5: Elaborate on the Idea
 

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 const skillsDir = fileURLToPath(new URL("../../skills/", import.meta.url))
 
 const expectedSkills = [
+  "chorus-brainstorm",
   "chorus",
   "chorus-develop",
   "chorus-idea",
@@ -25,7 +26,14 @@ const expectedMetadata: Record<
     role: "task:read",
     keywords: "chorus,ai-dlc,mcp,project,notifications,setup,search,mentions",
     tools: "chorus_checkin,chorus_get_notifications,chorus_search,chorus_search_mentionables",
-    sentinels: ["## Common Tools", "## Skill Routing", "task:read"],
+    sentinels: ["## Common Tools", "## Skill Routing", "task:read", "### Reports", "chorus-brainstorm"],
+  },
+  "chorus-brainstorm": {
+    workflow: "brainstorm",
+    role: "idea:write",
+    keywords: "brainstorm,idea,elaboration,decision-points,requirements",
+    tools: "chorus_pm_start_elaboration,chorus_answer_elaboration",
+    sentinels: ["## Step-by-Step", "ElaborationRound", "OpenCode `question` tool"],
   },
   "chorus-develop": {
     workflow: "development",
@@ -33,7 +41,7 @@ const expectedMetadata: Record<
     keywords: "task,implementation,self-check,verification,subagents,work-report",
     tools:
       "chorus_claim_task,chorus_update_task,chorus_report_work,chorus_report_criteria_self_check,chorus_submit_for_verify",
-    sentinels: ["## Tools", "## Workflow", "task:write", "OpenCode subagents"],
+    sentinels: ["## Tools", "## Workflow", "task:write", "OpenCode subagents", "### Step 11: Idea Completion Report (advisory)"],
   },
   "chorus-idea": {
     workflow: "ideation",
@@ -41,7 +49,7 @@ const expectedMetadata: Record<
     keywords: "idea,elaboration,requirements,questions,owner-confirmation,pm-workflow",
     tools:
       "chorus_claim_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration",
-    sentinels: ["## Tools", "## Workflow", "idea:write", "question"],
+    sentinels: ["## Tools", "## Workflow", "idea:write", "question", "### Step 4.5: Brainstorm Mode (Optional Prelude)"],
   },
   "chorus-openspec": {
     workflow: "openspec-aware",
@@ -81,7 +89,7 @@ const expectedMetadata: Record<
     keywords: "full-auto,ai-dlc,proposal-reviewer,task-reviewer,waves,autonomous",
     tools:
       "chorus_admin_create_project,chorus_pm_create_idea,chorus_pm_create_proposal,chorus_pm_submit_proposal,chorus_admin_approve_proposal,chorus_submit_for_verify,chorus_admin_verify_task",
-    sentinels: ["Full-auto AI-DLC", "## Workflow", "idea:write", "Wave-based"],
+    sentinels: ["Full-auto AI-DLC", "## Workflow", "idea:write", "Wave-based", "### Phase 5b: Idea Completion Report (mandatory)"],
   },
 }
 
@@ -151,12 +159,12 @@ describe("bundled skill metadata", () => {
       expect((frontmatter.description as string).length).toBeLessThanOrEqual(1024)
       expect(frontmatter.license).toBe("AGPL-3.0")
       expect(frontmatter.compatibility).toBe("opencode")
-      expect(metadata).toEqual({
-        author: "chorus",
-        version: "0.8.3",
-        category: "project-management",
-        mcp_server: "lazy-chorus-bridge",
-        workflow: expected.workflow,
+        expect(metadata).toEqual({
+          author: "chorus",
+          version: "0.9.0",
+          category: "project-management",
+          mcp_server: "lazy-chorus-bridge",
+          workflow: expected.workflow,
         role: expected.role,
         audience: "opencode-agents",
         source: "chorus-plugin",
@@ -180,6 +188,7 @@ describe("bundled skill metadata", () => {
     expect(chorusSource).toContain('"$schema": "https://opencode.ai/config.json"')
     expect(chorusSource).toContain('"mcp"')
     expect(chorusSource).toContain('"chorus"')
+    expect(chorusSource).toContain("chorus-brainstorm")
     expect(chorusSource).toContain("chorus-idea")
     expect(chorusSource).toContain("chorus-openspec")
     expect(chorusSource).toContain("chorus-yolo")

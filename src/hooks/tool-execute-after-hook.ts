@@ -363,6 +363,15 @@ export function createToolExecuteAfterHook(options: CreateToolExecuteAfterHookOp
         commentToolName: "chorus_get_comments",
       })
     }
+
+    if (tool === "chorus_admin_verify_task") {
+      const taskUuid = extractStringField(args, "taskUuid")
+      if (!taskUuid) return
+
+      const toolScope = await resolveChorusToolScope(options.stateStore)
+      const reminder = await buildIdeaCompletionReportReminder(options.chorusClient, taskUuid, toolScope)
+      if (reminder) attachIdeaCompletionReportReminder(output, reminder)
+    }
   }
 }
 
@@ -376,6 +385,10 @@ function resolveEffectiveToolCall(tool: string, args: unknown): { tool: string; 
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+type IdeaCompletionReportReminder = {
+  proposalUuid: string
 }
 
 async function readTargetSnapshot(
@@ -406,6 +419,94 @@ async function readTargetSnapshot(
 async function readExistingReview(stateStore: StateStore, targetKey: string) {
   const state = await stateStore.readOpenCodeState()
   return state.reviews[targetKey]
+}
+
+async function buildIdeaCompletionReportReminder(
+  client: ChorusMcpClient,
+  taskUuid: string,
+  scope?: ChorusToolScope,
+): Promise<IdeaCompletionReportReminder | undefined> {
+  try {
+    const task = await client.callTool("chorus_get_task", { taskUuid }, scope)
+    if (!isRecord(task)) return undefined
+
+    const proposalUuid = normalizeString(task.proposalUuid)
+    if (!proposalUuid) return undefined
+
+    const taskProject = isRecord(task.project) ? task.project : undefined
+    const projectUuid = normalizeString(taskProject?.uuid)
+    if (!projectUuid) return undefined
+
+    const proposal = await client.callTool("chorus_get_proposal", { proposalUuid }, scope)
+    if (!isRecord(proposal) || normalizeString(proposal.inputType) !== "idea") return undefined
+
+    const taskPage = await client.callTool(
+      "chorus_list_tasks",
+      { projectUuid, proposalUuids: [proposalUuid], pageSize: 200 },
+      scope,
+    )
+    const tasks = readCompleteCollection(taskPage, "tasks")
+    if (!tasks || tasks.length === 0) return undefined
+    if (tasks.some((item) => readTaskStatus(item) !== "done" && readTaskStatus(item) !== "closed")) return undefined
+
+    const documentsPage = await client.callTool(
+      "chorus_get_documents",
+      { projectUuid, type: "report", pageSize: 200 },
+      scope,
+    )
+    const documents = readCompleteCollection(documentsPage, "documents")
+    if (!documents) return undefined
+    if (documents.some((item) => normalizeString(item.proposalUuid) === proposalUuid)) return undefined
+
+    return { proposalUuid }
+  } catch {
+    return undefined
+  }
+}
+
+function readCompleteCollection(record: unknown, key: "tasks" | "documents"): Array<Record<string, unknown>> | undefined {
+  if (!isRecord(record)) return undefined
+  const total = typeof record.total === "number" ? record.total : undefined
+  const collection = Array.isArray(record[key]) ? record[key].filter(isRecord) : undefined
+  if (total === undefined || !collection) return undefined
+  if (total > collection.length) return undefined
+  return collection
+}
+
+function readTaskStatus(value: Record<string, unknown>): string | undefined {
+  return normalizeString(value.status)
+}
+
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined
+}
+
+function attachIdeaCompletionReportReminder(
+  output: { output: string },
+  reminder: IdeaCompletionReportReminder,
+): void {
+  const nextAction =
+    `Call chorus_create_report for proposal ${reminder.proposalUuid}. ` +
+    `Follow the tool description for the Summary / Decisions / Follow-ups template.`
+
+  const parsedOutput = parseJsonObject(output.output)
+  if (parsedOutput) {
+    output.output = JSON.stringify(
+      {
+        ...parsedOutput,
+        ideaCompletionReportReminder: {
+          toolName: "chorus_create_report",
+          proposalUuid: reminder.proposalUuid,
+          nextAction,
+        },
+      },
+      null,
+      2,
+    )
+    return
+  }
+
+  output.output = `${output.output}\nIdea-completion report reminder: ${nextAction}`
 }
 
 function toReviewerWaitResult(review: {

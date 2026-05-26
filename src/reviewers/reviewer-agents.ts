@@ -3,8 +3,8 @@ import { readBundledPrompt } from "../util/package-resource-paths"
 
 export const PROPOSAL_REVIEWER_AGENT = "proposal-reviewer"
 export const TASK_REVIEWER_AGENT = "task-reviewer"
-export const PROPOSAL_REVIEWER_MAX_STEPS = 40
-export const TASK_REVIEWER_MAX_STEPS = 50
+export const PROPOSAL_REVIEWER_MAX_STEPS = 100
+export const TASK_REVIEWER_MAX_STEPS = 100
 
 export async function applyReviewerAgentConfig(config: Config): Promise<void> {
   const [proposalPrompt, taskPrompt] = await Promise.all([

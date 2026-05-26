@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.8.3"
+  version: "0.9.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: development
@@ -264,6 +264,14 @@ If the reviewer returns **FAIL**, or the task is reopened after verification:
 
 Once Admin verifies (status: `done`), move to the next available task (back to Step 2).
 
+### Step 11: Idea Completion Report (advisory)
+
+If the task you just submitted or helped finish appears to be the **last remaining task of its Idea** and your permission matrix includes `document:write`, offer to create an idea-completion report.
+
+- Use the OpenCode `question` tool to ask whether the user wants the report written now.
+- If they agree, call `chorus_create_report` with the proposal UUID and follow the tool description for the Summary / Decisions / Follow-ups sections.
+- If they decline, continue normally. The plugin may remind you again after a later admin verification if the proposal is complete and still has no report.
+
 ---
 
 ## Session (Sub-Agents Only)
@@ -370,7 +378,7 @@ Sub-agents need access to the lazy Chorus bridge configured by the opencode-chor
 |---------|----------|
 | Sub-agent can't access Chorus MCP tools | Verify MCP is configured at project level and the API key includes the needed matrix entries, usually `task:read` + `task:write` |
 | UI doesn't show active workers | Sub-agent forgot `chorus_session_checkin_task`. Check: `chorus_get_session` |
-| Session shows "inactive" (yellow) | No heartbeat in 1h. TeammateIdle hook should auto-send. Agent may have crashed |
+| Session disappears from default views | The session may be stale after about 1h with no activity. Query it via MCP, send a session-touching tool call or heartbeat to refresh visibility, and check whether the agent crashed |
 | Task stuck in wrong status | Spawn new sub-agent with same name (plugin auto-reopens session), or use `chorus_update_task` to reset |
 | Duplicate sessions | Never call `chorus_create_session` — plugin handles all session creation. Close extras via Settings page |
 | Sub-agent didn't receive session | Check plugin is loaded (`/plugin list`) and `CHORUS_URL` is set. Ensure `name` parameter is set |
