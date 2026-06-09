@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: full-auto
@@ -191,7 +191,6 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    ```
    chorus_answer_elaboration({
      ideaUuid: "<idea-uuid>",
-     roundUuid: "<round-uuid>",
      answers: [
        { questionId: "q1", selectedOptionId: "a", customText: "Rationale: ..." },
        // ...
@@ -199,12 +198,12 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    })
    ```
 
+   In the normal self-elaboration path there is one active round, so `roundUuid` can be omitted and auto-located.
+
 3. **Validate** (no issues in self-mode):
    ```
    chorus_pm_validate_elaboration({
-     ideaUuid: "<idea-uuid>",
-     roundUuid: "<round-uuid>",
-     issues: []
+     ideaUuid: "<idea-uuid>"
    })
    ```
 

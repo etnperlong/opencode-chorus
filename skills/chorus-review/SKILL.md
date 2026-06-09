@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: review
@@ -122,7 +122,7 @@ Prioritize: **Proposals first** (they unblock PM and Developer work), then task 
 #### A1: Read the Proposal
 
 ```
-chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
+chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
 ```
 
 This returns: title, description, input ideas, **document drafts** (PRD, tech design), **task drafts** (with descriptions and acceptance criteria).

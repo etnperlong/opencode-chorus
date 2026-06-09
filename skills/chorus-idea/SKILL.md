@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: ideation
@@ -56,8 +56,8 @@ All post-elaboration progress (planning, building, verifying, done) is **derived
 
 | Tool | Purpose |
 |------|---------|
-| `chorus_pm_start_elaboration` | Start an elaboration round with structured questions |
-| `chorus_pm_validate_elaboration` | Validate answers (resolve or create follow-up round) |
+| `chorus_pm_start_elaboration` | Start any elaboration round: first round, follow-up, or appended-after-resolution |
+| `chorus_pm_validate_elaboration` | Resolve an Idea's elaboration once all rounds are answered |
 | `chorus_pm_skip_elaboration` | Skip elaboration for trivially clear Ideas |
 | `chorus_answer_elaboration` | Submit answers for an elaboration round |
 | `chorus_get_elaboration` | Get full elaboration state (rounds, questions, answers) |
@@ -152,8 +152,8 @@ question({
 
 When `chorus-brainstorm` returns, you own the lifecycle decision:
 
-- if the synthesized round already covers the open decisions, call `chorus_pm_validate_elaboration` with `issues: []` to resolve elaboration;
-- if important gaps remain, call `chorus_pm_validate_elaboration` with `issues` and `followUpQuestions` to open a structured follow-up round.
+- if the synthesized round already covers the open decisions, call `chorus_pm_validate_elaboration({ ideaUuid })` to resolve elaboration;
+- if important gaps remain, call `chorus_pm_start_elaboration` again to open a structured follow-up round.
 
 Either outcome ends the brainstorm prelude; skip directly to validation behavior rather than re-running the full Step 5 flow from scratch.
 
@@ -181,24 +181,26 @@ chorus_pm_skip_elaboration({
 
 2. **Create elaboration questions:**
 
+   `chorus_pm_start_elaboration` creates any round in the lifecycle: the first round, a follow-up round derived from previous answers, or an appended round after an already-resolved Idea when new information appears. The current tool call takes only `ideaUuid`, `depth`, and `questions`; do not pass a separate `isAppended` argument. Treat appended-after-resolution as a lifecycle semantic reflected by Chorus state/metadata, not as an extra input field.
+
    > **Note:** Do NOT include an "Other" option in your questions. The UI automatically adds a free-text "Other" option to every question.
 
    ```
    chorus_pm_start_elaboration({
-     ideaUuid: "<idea-uuid>",
-     depth: "standard",
-     questions: [
-       {
-         id: "q1",
+      ideaUuid: "<idea-uuid>",
+      depth: "standard",
+      questions: [
+        {
+          id: "q1",
           text: "What permission level should this feature require?",
-         category: "functional",
-         options: [
-           { id: "a", label: "All users" },
-           { id: "b", label: "Admin only" },
-           { id: "c", label: "Role-based (configurable)" }
-         ]
-       }
-     ]
+          category: "functional",
+          options: [
+            { id: "a", label: "All users" },
+            { id: "b", label: "Admin only" },
+            { id: "c", label: "Role-based (configurable)" }
+          ]
+        }
+      ]
    })
    ```
 
@@ -220,17 +222,16 @@ chorus_pm_skip_elaboration({
    })
    ```
 
-   After the user answers, map their selections back to option IDs and call `chorus_answer_elaboration`. If the user selected "Other", set `selectedOptionId: null` and `customText` to their input.
+   After the user answers, map their selections back to option IDs and call `chorus_answer_elaboration`. If the user selected "Other", set `selectedOptionId: null` and `customText` to their input. `roundUuid` is optional when there is exactly one active round; omit it in that case and Chorus auto-locates the active round. Include `roundUuid` only when you need to disambiguate.
 
 4. **Submit answers:**
    ```
    chorus_answer_elaboration({
-     ideaUuid: "<idea-uuid>",
-     roundUuid: "<round-uuid>",
-     answers: [
-       { questionId: "q1", selectedOptionId: "c", customText: null },
-       { questionId: "q2", selectedOptionId: null, customText: "Custom hybrid approach" }
-     ]
+      ideaUuid: "<idea-uuid>",
+      answers: [
+        { questionId: "q1", selectedOptionId: "c", customText: null },
+        { questionId: "q2", selectedOptionId: null, customText: "Custom hybrid approach" }
+      ]
    })
    ```
 
@@ -260,35 +261,33 @@ chorus_pm_skip_elaboration({
    c. **Wait for confirmation** via comments.
 
    d. **Based on the response:**
-      - **Confirmed** — Proceed to validate with empty issues
-      - **Additions/corrections** — Incorporate feedback, optionally start a follow-up round
+      - **Confirmed** — Proceed to validate the Idea
+      - **Additions/corrections** — Incorporate feedback, then call `chorus_pm_start_elaboration` again for a follow-up round if structured answers are needed
       - **Unclear** — Ask clarifying questions via another comment
 
 6. **Validate the elaboration:**
 
+   Validate only after all active rounds are answered, no gaps remain, and the owner has confirmed your understanding. This is an `idea:admin` action, so ask for human confirmation before calling it unless you are in explicit YOLO mode.
+
    ```
    chorus_pm_validate_elaboration({
-     ideaUuid: "<idea-uuid>",
-     roundUuid: "<round-uuid>",
-     issues: [],
-     followUpQuestions: []
+      ideaUuid: "<idea-uuid>"
    })
    ```
 
-   If issues are found (contradictions, ambiguities, incomplete answers), include them in `issues` and provide `followUpQuestions` for a new round:
+   If issues are found (contradictions, ambiguities, incomplete answers), do not validate. Create another elaboration round with `chorus_pm_start_elaboration`, ask the user, answer it, and then re-check whether validation is now safe:
 
    ```
-   chorus_pm_validate_elaboration({
+   chorus_pm_start_elaboration({
      ideaUuid: "<idea-uuid>",
-     roundUuid: "<round-uuid>",
-     issues: [
-        { questionId: "q1", type: "ambiguity", description: "Permission-based access selected but no permissions defined" }
-     ],
-     followUpQuestions: [
-        { id: "fq1", text: "Which specific permissions are required?", category: "functional", options: [...] }
+     depth: "minimal",
+     questions: [
+       { id: "fq1", text: "Which specific permissions are required?", category: "functional", options: [...] }
      ]
    })
    ```
+
+   Loop explicitly: answers that derive new questions go back to `chorus_pm_start_elaboration`; only call `chorus_pm_validate_elaboration({ ideaUuid })` when all questions are resolved.
 
 7. **Check elaboration status** at any time:
    ```
@@ -297,9 +296,11 @@ chorus_pm_skip_elaboration({
 
 **Elaboration as audit trail:** Even if the user discusses requirements with you outside the formal elaboration flow, record key decisions as elaboration rounds so they are persisted and visible to the team.
 
+**Legacy round states:** `validated` and `needs_followup` may appear in historical elaboration data only. New v0.9.4 flow resolves at the Idea level and creates follow-ups by starting another elaboration round.
+
 **Question categories:** `functional`, `non_functional`, `business_context`, `technical_context`, `user_scenario`, `scope`
 
-**Validation issue types:** `contradiction`, `ambiguity`, `incomplete`
+**Follow-up issue types:** Use `contradiction`, `ambiguity`, or `incomplete` to classify gaps before creating another round.
 
 ---
 

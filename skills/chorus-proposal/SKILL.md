@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: planning
@@ -156,7 +156,10 @@ chorus_pm_add_task_draft({
   description: "Detailed description of what to build...",
   priority: "high",
   storyPoints: 3,
-  acceptanceCriteria: "- [ ] Criteria 1\n- [ ] Criteria 2"
+  acceptanceCriteriaItems: [
+    { description: "Criteria 1", required: true },
+    { description: "Criteria 2", required: true }
+  ]
 })
 
 # Second task — depends on first
@@ -166,10 +169,14 @@ chorus_pm_add_task_draft({
   description: "Unit and integration tests...",
   priority: "medium",
   storyPoints: 2,
-  acceptanceCriteria: "- [ ] Test coverage > 80%",
+  acceptanceCriteriaItems: [
+    { description: "Test coverage > 80%", required: true }
+  ],
   dependsOnDraftUuids: ["<draftUuid-from-first-task>"]
 })
 ```
+
+Prefer `acceptanceCriteriaItems` for all new task drafts. Legacy Markdown `acceptanceCriteria` may exist in older proposals, but structured criteria are the current format and support self-checking.
 
 **Task priority:** `low`, `medium`, `high`
 
@@ -177,13 +184,22 @@ chorus_pm_add_task_draft({
 
 ```
 # Review current state
-chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
+chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
 
 # Update a document draft — write the updated content to a staging file first, then:
 chorus_pm_update_document_draft({
   proposalUuid: "<proposal-uuid>",
   draftUuid: "<draft-uuid>",
   contentPath: "<chorus-staging-dir>/prd.md"
+})
+
+# Update task draft acceptance criteria in structured form:
+chorus_pm_update_task_draft({
+  proposalUuid: "<proposal-uuid>",
+  draftUuid: "<task-draft-uuid>",
+  acceptanceCriteriaItems: [
+    { description: "Updated criterion", required: true }
+  ]
 })
 ```
 
@@ -223,7 +239,7 @@ After submission in OpenCode, the plugin auto-launches `proposal-reviewer` when 
 
 1. **Read feedback:**
    ```
-   chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
+   chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
    chorus_get_comments({ targetType: "proposal", targetUuid: "<proposal-uuid>" })
    ```
    Identify BLOCKERs from the reviewer VERDICT or rejection note.

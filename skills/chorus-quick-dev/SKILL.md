@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: quick-development
@@ -110,7 +110,7 @@ chorus_claim_task({ taskUuid: "<task-uuid>" })
 
 ### Step 3: Edit Details (if needed)
 
-Use `chorus_update_task` to refine the task after creation. **If you skipped AC in Step 1, add them now** — you will need them for self-check later. Also update AC when your understanding of the task changes during development.
+Use `chorus_update_task` to refine the task after creation. **If you skipped AC in Step 1, add them now with `acceptanceCriteriaItems`** — you will need them for self-check later. Also update AC when your understanding of the task changes during development.
 
 ```
 chorus_update_task({

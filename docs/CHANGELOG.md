@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- Updated bundled Chorus skills to upstream skill metadata version `0.9.4`, including the v0.9.4 elaboration contract, structured acceptance criteria examples, and explicit `chorus_get_proposal` section usage.
+- Bumped package version to `0.5.1`.
+
 ## v0.5.0 - 2026-05-26
 
 ### Added

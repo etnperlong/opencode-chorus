@@ -161,7 +161,7 @@ describe("bundled skill metadata", () => {
       expect(frontmatter.compatibility).toBe("opencode")
         expect(metadata).toEqual({
           author: "chorus",
-          version: "0.9.0",
+          version: "0.9.4",
           category: "project-management",
           mcp_server: "lazy-chorus-bridge",
           workflow: expected.workflow,

@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: brainstorm
@@ -145,12 +145,13 @@ Then answer it in one call:
 ```
 chorus_answer_elaboration({
   ideaUuid: "<idea-uuid>",
-  roundUuid: "<round-uuid>",
   answers: [
     { questionId: "q1", selectedOptionId: "a", customText: "Rationale..." }
   ]
 })
 ```
+
+   Omit `roundUuid` when this is the only active round; Chorus auto-locates it.
 
 ### 7. Return Control
 
@@ -158,8 +159,8 @@ Stop here and return to `chorus-idea`.
 
 `chorus-idea` decides what happens next:
 
-- if the synthesized round is enough, it resolves elaboration with `chorus_pm_validate_elaboration({ issues: [] })`;
-- if important gaps remain, it opens a follow-up round with `issues` and `followUpQuestions`.
+- if the synthesized round is enough, it resolves elaboration with `chorus_pm_validate_elaboration({ ideaUuid })`;
+- if important gaps remain, it opens a follow-up round with `chorus_pm_start_elaboration`.
 
 ---
 

@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.0"
+  version: "0.9.4"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: development
@@ -137,8 +137,10 @@ Each task and proposal includes a `commentCount` field — use it to decide whic
 
 4. **Read the originating proposal** for design intent:
     ```
-    chorus_get_proposal({ proposalUuid: "<proposal-uuid>" })
+    chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
     ```
+
+   Use `section: "full"` when you need the complete proposal, including document and task draft content. Use `section: "documents"` or `section: "tasks"` if only one side is needed.
 
    If the proposal description or comments include `OpenSpec change slug: <slug>`, treat local OpenSpec files as the document source of truth. When implementation reveals a required document update:
     - In the OpenSpec change directory for `<slug>`, update `proposal.md`, `design.md`, or `specs/**/spec.md` first.
