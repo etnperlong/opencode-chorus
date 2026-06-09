@@ -54,7 +54,7 @@ For complex work, use `chorus-idea` + `chorus-proposal` instead.
 
 ## Pre-Flight: Admin Self-Verify Check
 
-**Before creating tasks**, if `chorus_checkin()` shows `task:admin` in your permission matrix, ask the user:
+**Before creating tasks**, if `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` shows `task:admin` in your permission matrix, ask the user:
 
 > "I have admin privileges. After development, should I verify the task myself, or leave it for another admin to verify?"
 
@@ -83,7 +83,7 @@ This matters because `admin_agent` presets, or custom keys with `task:admin`, ca
 **Always include `acceptanceCriteriaItems`** — these are the foundation for self-checking in Step 6. Write specific, testable criteria that you can objectively verify after development. Vague AC like "works correctly" defeats the purpose; prefer "returns 200 on GET /api/foo with valid token".
 
 ```
-chorus_create_tasks({
+chorus_tool_execute({ toolName: "chorus_create_tasks", arguments: {
   projectUuid: "<project-uuid>",
   tasks: [{
     title: "Fix login redirect loop on Safari",
@@ -95,7 +95,7 @@ chorus_create_tasks({
       { description: "Existing Chrome/Firefox behavior unchanged", required: true }
     ]
   }]
-})
+} })
 ```
 
 **`proposalUuid` is optional:**
@@ -105,7 +105,7 @@ chorus_create_tasks({
 ### Step 2: Claim the Task
 
 ```
-chorus_claim_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_claim_task", arguments: { taskUuid: "<task-uuid>" } })
 ```
 
 ### Step 3: Edit Details (if needed)
@@ -113,7 +113,7 @@ chorus_claim_task({ taskUuid: "<task-uuid>" })
 Use `chorus_update_task` to refine the task after creation. **If you skipped AC in Step 1, add them now with `acceptanceCriteriaItems`** — you will need them for self-check later. Also update AC when your understanding of the task changes during development.
 
 ```
-chorus_update_task({
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: {
   taskUuid: "<task-uuid>",
   description: "Updated with more details...",
   acceptanceCriteriaItems: [
@@ -121,49 +121,49 @@ chorus_update_task({
     { description: "Added CSRF token handling", required: true }
   ],
   addDependsOn: ["<other-task-uuid>"]
-})
+} })
 ```
 
 ### Step 4: Start Working
 
 ```
-chorus_update_task({ taskUuid: "<task-uuid>", status: "in_progress" })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-uuid>", status: "in_progress" } })
 ```
 
 **Sub-agents:** pass `sessionUuid` for attribution:
 ```
-chorus_update_task({ taskUuid: "<task-uuid>", status: "in_progress", sessionUuid: "<session-uuid>" })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-uuid>", status: "in_progress", sessionUuid: "<session-uuid>" } })
 ```
 
 ### Step 5: Report Progress
 
 ```
-chorus_report_work({
+chorus_tool_execute({ toolName: "chorus_report_work", arguments: {
   taskUuid: "<task-uuid>",
   report: "Fixed Safari cookie issue:\n- Root cause: SameSite=Strict incompatible with redirect\n- Changed to SameSite=Lax\n- Commit: abc1234",
   sessionUuid: "<session-uuid>"
-})
+} })
 ```
 
 ### Step 6: Self-Check Acceptance Criteria
 
 ```
-chorus_report_criteria_self_check({
+chorus_tool_execute({ toolName: "chorus_report_criteria_self_check", arguments: {
   taskUuid: "<task-uuid>",
   criteria: [
     { uuid: "<ac-uuid-1>", devStatus: "passed", devEvidence: "Tested on Safari 17.2" },
     { uuid: "<ac-uuid-2>", devStatus: "passed", devEvidence: "Chrome/Firefox regression tests pass" }
   ]
-})
+} })
 ```
 
 ### Step 7: Submit for Verification (or Self-Verify)
 
 ```
-chorus_submit_for_verify({
+chorus_tool_execute({ toolName: "chorus_submit_for_verify", arguments: {
   taskUuid: "<task-uuid>",
   summary: "Fixed Safari login redirect loop. Changed SameSite cookie policy. All AC passed."
-})
+} })
 ```
 
 In OpenCode, `chorus_submit_for_verify` auto-launches `task-reviewer` when reviewer gating is enabled and waits for the current VERDICT or timeout before returning. See `chorus-develop` for full reviewer-gate handling.
@@ -171,7 +171,7 @@ In OpenCode, `chorus_submit_for_verify` auto-launches `task-reviewer` when revie
 **Admin self-verification:** If your permission matrix includes `task:admin` and the user approved self-verification in the Pre-Flight check, you can verify the task yourself immediately after submitting:
 
 ```
-chorus_admin_verify_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_verify_task", arguments: { taskUuid: "<task-uuid>" } })
 ```
 
 This completes the full autonomous cycle: create → develop → verify → done.

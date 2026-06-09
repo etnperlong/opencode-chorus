@@ -61,7 +61,7 @@ Permission strings use `<resource>:<action>`, for example `task:read`, `task:wri
 
 ### Role Presets
 
-The Chorus UI can grant common role presets. Custom API keys may use any subset of the matrix, so always trust `chorus_checkin()` over the preset name.
+The Chorus UI can grant common role presets. Custom API keys may use any subset of the matrix, so always trust `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` over the preset name.
 
 | Preset | Intended use | Typical permission set |
 |--------|--------------|------------------------|
@@ -227,7 +227,7 @@ Use @mentions to notify specific users or agents. Mention syntax: `@[DisplayName
 | `chorus_search_mentionables` | Search for users and agents that can be @mentioned |
 
 **Mention workflow:**
-1. Search: `chorus_search_mentionables({ query: "yifei" })`
+1. Search: `chorus_tool_execute({ toolName: "chorus_search_mentionables", arguments: { query: "yifei" } })`
 2. Write: `@[Yifei](user:uuid-here)` in your content
 3. Mentioned users/agents automatically receive a notification
 
@@ -257,9 +257,9 @@ Use @mentions to notify specific users or agents. Mention syntax: `@[DisplayName
 | `chorus_mark_notification_read` | Mark a single notification or all notifications as read |
 
 **Recommended workflow:**
-1. `chorus_checkin()` — check `notifications.unreadCount`
-2. If > 0, call `chorus_get_notifications()` — auto-marks as read
-3. To peek without marking: `chorus_get_notifications({ autoMarkRead: false })`
+1. `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` — check `notifications.unreadCount`
+2. If > 0, call `chorus_tool_execute({ toolName: "chorus_get_notifications", arguments: {} })` — auto-marks as read
+3. To peek without marking: `chorus_tool_execute({ toolName: "chorus_get_notifications", arguments: { autoMarkRead: false } })`
 
 ---
 
@@ -321,7 +321,7 @@ If it fails, check: API Key correct (`cho_` prefix)? URL reachable? OpenCode res
 
 ### 4. Permission-Oriented Tool Access
 
-Use `chorus_checkin()` to inspect your actual matrix. The common tool families map to resources and actions like this:
+Use `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` to inspect your actual matrix. The common tool families map to resources and actions like this:
 
 | Resource | `read` examples | `write` examples | `admin` examples |
 |----------|-----------------|------------------|------------------|
@@ -367,10 +367,10 @@ Chorus integrations share lifecycle concepts, but runtime wiring differs. For Op
 
 ## Execution Rules
 
-1. **Always check in first** — Call `chorus_checkin()` at session start
+1. **Always check in first** — Call `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` at session start
 2. **Sessions are automatic** — The opencode-chorus plugin creates, heartbeats, and closes sessions. Never call `chorus_create_session` or `chorus_close_session`.
 3. **Session checkin is sub-agent only** — Sub-agents call `chorus_session_checkin_task` / `chorus_session_checkout_task` and pass `sessionUuid`. Main agent skips session tools entirely.
-4. **Stay within your permissions** — Use only tools allowed by your `chorus_checkin()` permission matrix; presets are shortcuts, not proof of access
+4. **Stay within your permissions** — Use only tools allowed by your `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` permission matrix; presets are shortcuts, not proof of access
 5. **Report progress** — Use `chorus_report_work` or `chorus_add_comment`
 6. **Follow the lifecycle** — Ideas flow through Proposals to Tasks; don't skip steps
 7. **Set up task dependency DAG** — Use `dependsOnDraftUuids` in task drafts to express execution order
@@ -429,10 +429,10 @@ This is the core overview skill. For stage-specific workflows, use:
 
 ### Getting Started
 
-1. Call `chorus_checkin()` to learn your permissions and assignments
+1. Call `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })` to learn your permissions and assignments
 2. Based on your role preset or matrix grants, use the appropriate skill:
    - `developer_agent` or custom grants with `task:read` + `task:write` → `chorus-develop`
    - `pm_agent` or custom grants with `idea:write` + `proposal:write` + `document:write` → `chorus-idea` then `chorus-proposal`
    - `admin_agent` or custom grants with `task:admin` / governance permissions → `chorus-review`
    - **Full Auto** → `chorus-yolo` when the matrix includes planning, development, and verification permissions (`idea:write`, `proposal:write`, `document:write`, `task:write`, and `task:admin`)
-   - Custom minimal API keys → choose the narrowest skill matching the permissions returned by `chorus_checkin()`
+   - Custom minimal API keys → choose the narrowest skill matching the permissions returned by `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })`

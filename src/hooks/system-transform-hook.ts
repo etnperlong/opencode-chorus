@@ -10,7 +10,7 @@ export const PER_TURN_REMINDER =
   "[Chorus Plugin Active]\n- Sub-agent sessions are auto-managed by hooks. Do NOT call chorus_create_session or chorus_close_session for sub-agents.\n- When spawning sub-agents, pass Chorus task UUIDs; session lifecycle is auto-injected."
 
 export const SUBSESSION_WORKFLOW_GUIDANCE =
-  "## Chorus Task Workflow\nWhen working on a Chorus task:\n1. Start work: chorus_update_task({ taskUuid, status: \"in_progress\" })\n2. Report progress: chorus_report_work({ taskUuid, report })\n3. Self-check acceptance criteria against implementation\n4. Submit: chorus_submit_for_verify({ taskUuid, summary })\nDo NOT call chorus_create_session or chorus_close_session."
+  "## Chorus Task Workflow\nWhen working on a Chorus task:\n1. Start work: chorus_tool_execute({ toolName: \"chorus_update_task\", arguments: { taskUuid, status: \"in_progress\" } })\n2. Report progress: chorus_tool_execute({ toolName: \"chorus_report_work\", arguments: { taskUuid, report } })\n3. Self-check acceptance criteria against implementation\n4. Submit: chorus_tool_execute({ toolName: \"chorus_submit_for_verify\", arguments: { taskUuid, summary } })\nDo NOT call chorus_create_session or chorus_close_session."
 
 export const PLAN_AGENT_GUIDANCE =
   "## Chorus AI-DLC Planning Workflow\nWhen planning implementation:\n1. Identify or create a Chorus Idea for this requirement\n2. Create a Proposal with document drafts and task drafts\n3. Set up the task dependency DAG\n4. Submit the Proposal for admin approval\n5. After approval, tasks materialize and can be claimed\nDo NOT start coding without an approved Chorus Proposal."

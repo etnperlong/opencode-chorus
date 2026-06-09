@@ -71,7 +71,7 @@ All post-elaboration progress (planning, building, verifying, done) is **derived
 ### Step 1: Check In
 
 ```
-chorus_checkin()
+chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 ```
 
 Review your persona, current assignments, and pending work counts.
@@ -79,13 +79,13 @@ Review your persona, current assignments, and pending work counts.
 ### Step 2: Find Work
 
 ```
-chorus_get_available_ideas({ projectUuid: "<project-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_available_ideas", arguments: { projectUuid: "<project-uuid>" } })
 ```
 
 Or check existing assignments:
 
 ```
-chorus_get_my_assignments()
+chorus_tool_execute({ toolName: "chorus_get_my_assignments", arguments: {} })
 ```
 
 ### Step 3: Claim an Idea
@@ -93,7 +93,7 @@ chorus_get_my_assignments()
 Claiming automatically transitions the Idea to `elaborating` status:
 
 ```
-chorus_claim_idea({ ideaUuid: "<idea-uuid>" })
+chorus_tool_execute({ toolName: "chorus_claim_idea", arguments: { ideaUuid: "<idea-uuid>" } })
 ```
 
 ### Step 4: Gather Context
@@ -102,28 +102,28 @@ Before elaborating, understand the full picture:
 
 1. **Read the idea in detail:**
    ```
-   chorus_get_idea({ ideaUuid: "<idea-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_idea", arguments: { ideaUuid: "<idea-uuid>" } })
    ```
 
 2. **Read existing project documents** (for context, tech stack, conventions):
    ```
-   chorus_get_documents({ projectUuid: "<project-uuid>" })
-   chorus_get_document({ documentUuid: "<doc-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_documents", arguments: { projectUuid: "<project-uuid>" } })
+   chorus_tool_execute({ toolName: "chorus_get_document", arguments: { documentUuid: "<doc-uuid>" } })
    ```
 
 3. **Review past proposals** (to understand patterns and standards):
    ```
-   chorus_get_proposals({ projectUuid: "<project-uuid>", status: "approved" })
+   chorus_tool_execute({ toolName: "chorus_get_proposals", arguments: { projectUuid: "<project-uuid>", status: "approved" } })
    ```
 
 4. **Check existing tasks** (to avoid duplication):
    ```
-   chorus_list_tasks({ projectUuid: "<project-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_list_tasks", arguments: { projectUuid: "<project-uuid>" } })
    ```
 
 5. **Read comments** on the idea for additional context:
    ```
-   chorus_get_comments({ targetType: "idea", targetUuid: "<idea-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "idea", targetUuid: "<idea-uuid>" } })
    ```
 
 ### Step 4.5: Brainstorm Mode (Optional Prelude)
@@ -152,7 +152,7 @@ question({
 
 When `chorus-brainstorm` returns, you own the lifecycle decision:
 
-- if the synthesized round already covers the open decisions, call `chorus_pm_validate_elaboration({ ideaUuid })` to resolve elaboration;
+- if the synthesized round already covers the open decisions, call `chorus_tool_execute({ toolName: "chorus_pm_validate_elaboration", arguments: { ideaUuid } })` to resolve elaboration;
 - if important gaps remain, call `chorus_pm_start_elaboration` again to open a structured follow-up round.
 
 Either outcome ends the brainstorm prelude; skip directly to validation behavior rather than re-running the full Step 5 flow from scratch.
@@ -166,10 +166,10 @@ Either outcome ends the brainstorm prelude; skip directly to validation behavior
 You may skip elaboration, but **you MUST ask the user for permission first** via OpenCode question tool before calling `chorus_pm_skip_elaboration`. Never skip on your own judgment alone.
 
 ```
-chorus_pm_skip_elaboration({
+chorus_tool_execute({ toolName: "chorus_pm_skip_elaboration", arguments: {
   ideaUuid: "<idea-uuid>",
   reason: "Bug fix with clear reproduction steps"
-})
+} })
 ```
 
 #### Standard/Complex Ideas (run elaboration)
@@ -186,7 +186,7 @@ chorus_pm_skip_elaboration({
    > **Note:** Do NOT include an "Other" option in your questions. The UI automatically adds a free-text "Other" option to every question.
 
    ```
-   chorus_pm_start_elaboration({
+   chorus_tool_execute({ toolName: "chorus_pm_start_elaboration", arguments: {
       ideaUuid: "<idea-uuid>",
       depth: "standard",
       questions: [
@@ -201,7 +201,7 @@ chorus_pm_skip_elaboration({
           ]
         }
       ]
-   })
+   } })
    ```
 
 3. **Present questions to the user — MUST use `OpenCode question tool`.** Do NOT display questions as plain text. Map each elaboration question to an OpenCode question tool call (max 4 questions per call; batch if needed):
@@ -226,13 +226,13 @@ chorus_pm_skip_elaboration({
 
 4. **Submit answers:**
    ```
-   chorus_answer_elaboration({
+   chorus_tool_execute({ toolName: "chorus_answer_elaboration", arguments: {
       ideaUuid: "<idea-uuid>",
       answers: [
         { questionId: "q1", selectedOptionId: "c", customText: null },
         { questionId: "q2", selectedOptionId: null, customText: "Custom hybrid approach" }
       ]
-   })
+   } })
    ```
 
    Answer format:
@@ -246,16 +246,16 @@ chorus_pm_skip_elaboration({
 
    a. **Get owner info** from checkin response (`agent.owner`) or search:
       ```
-      chorus_search_mentionables({ query: "owner-name" })
+      chorus_tool_execute({ toolName: "chorus_search_mentionables", arguments: { query: "owner-name" } })
       ```
 
    b. **Post a summary comment** on the idea:
       ```
-      chorus_add_comment({
+      chorus_tool_execute({ toolName: "chorus_add_comment", arguments: {
         targetType: "idea",
         targetUuid: "<idea-uuid>",
         content: "@[Owner Name](user:owner-uuid) I've reviewed the elaboration answers. Here's my understanding:\n\n- Key requirement 1: ...\n- Key requirement 2: ...\n\nDoes this match your intent?"
-      })
+      } })
       ```
 
    c. **Wait for confirmation** via comments.
@@ -270,28 +270,28 @@ chorus_pm_skip_elaboration({
    Validate only after all active rounds are answered, no gaps remain, and the owner has confirmed your understanding. This is an `idea:admin` action, so ask for human confirmation before calling it unless you are in explicit YOLO mode.
 
    ```
-   chorus_pm_validate_elaboration({
+   chorus_tool_execute({ toolName: "chorus_pm_validate_elaboration", arguments: {
       ideaUuid: "<idea-uuid>"
-   })
+   } })
    ```
 
    If issues are found (contradictions, ambiguities, incomplete answers), do not validate. Create another elaboration round with `chorus_pm_start_elaboration`, ask the user, answer it, and then re-check whether validation is now safe:
 
    ```
-   chorus_pm_start_elaboration({
+   chorus_tool_execute({ toolName: "chorus_pm_start_elaboration", arguments: {
      ideaUuid: "<idea-uuid>",
      depth: "minimal",
      questions: [
        { id: "fq1", text: "Which specific permissions are required?", category: "functional", options: [...] }
      ]
-   })
+   } })
    ```
 
-   Loop explicitly: answers that derive new questions go back to `chorus_pm_start_elaboration`; only call `chorus_pm_validate_elaboration({ ideaUuid })` when all questions are resolved.
+   Loop explicitly: answers that derive new questions go back to `chorus_pm_start_elaboration`; only call `chorus_tool_execute({ toolName: "chorus_pm_validate_elaboration", arguments: { ideaUuid } })` when all questions are resolved.
 
 7. **Check elaboration status** at any time:
    ```
-   chorus_get_elaboration({ ideaUuid: "<idea-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_elaboration", arguments: { ideaUuid: "<idea-uuid>" } })
    ```
 
 **Elaboration as audit trail:** Even if the user discusses requirements with you outside the formal elaboration flow, record key decisions as elaboration rounds so they are persisted and visible to the team.

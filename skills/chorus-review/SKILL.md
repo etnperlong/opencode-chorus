@@ -92,7 +92,7 @@ When reviewing proposals or tasks, use the automatic reviewer gate before manual
 ### Step 1: Check In
 
 ```
-chorus_checkin()
+chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 ```
 
 Pay attention to:
@@ -106,13 +106,13 @@ Check what needs your attention:
 
 ```
 # Pending proposals
-chorus_get_proposals({ projectUuid: "<project-uuid>", status: "pending" })
+chorus_tool_execute({ toolName: "chorus_get_proposals", arguments: { projectUuid: "<project-uuid>", status: "pending" } })
 
 # Tasks awaiting verification
-chorus_list_tasks({ projectUuid: "<project-uuid>", status: "to_verify" })
+chorus_tool_execute({ toolName: "chorus_list_tasks", arguments: { projectUuid: "<project-uuid>", status: "to_verify" } })
 
 # Recent activity
-chorus_get_activity({ projectUuid: "<project-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_activity", arguments: { projectUuid: "<project-uuid>" } })
 ```
 
 Prioritize: **Proposals first** (they unblock PM and Developer work), then task verifications.
@@ -122,7 +122,7 @@ Prioritize: **Proposals first** (they unblock PM and Developer work), then task 
 #### A1: Read the Proposal
 
 ```
-chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
+chorus_tool_execute({ toolName: "chorus_get_proposal", arguments: { proposalUuid: "<proposal-uuid>", section: "full" } })
 ```
 
 This returns: title, description, input ideas, **document drafts** (PRD, tech design), **task drafts** (with descriptions and acceptance criteria).
@@ -150,7 +150,7 @@ This returns: title, description, input ideas, **document drafts** (PRD, tech de
 #### A3: Read Comments
 
 ```
-chorus_get_comments({ targetType: "proposal", targetUuid: "<proposal-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "proposal", targetUuid: "<proposal-uuid>" } })
 ```
 
 #### A3.5: Independent Review
@@ -162,10 +162,10 @@ If the proposal just returned from `chorus_pm_submit_proposal`, use the gated re
 **Approve:**
 
 ```
-chorus_admin_approve_proposal({
+chorus_tool_execute({ toolName: "chorus_admin_approve_proposal", arguments: {
   proposalUuid: "<proposal-uuid>",
   reviewNote: "Approved. Good breakdown of tasks."
-})
+} })
 ```
 
 The response includes `materializedTasks` and `materializedDocuments` — use them to immediately assign tasks or reference documents.
@@ -177,16 +177,16 @@ When approved:
 **Reject:**
 
 ```
-chorus_pm_reject_proposal({
+chorus_tool_execute({ toolName: "chorus_pm_reject_proposal", arguments: {
   proposalUuid: "<proposal-uuid>",
   reviewNote: "PRD missing error handling requirements. Task 3 needs clearer AC."
-})
+} })
 
-chorus_add_comment({
+chorus_tool_execute({ toolName: "chorus_add_comment", arguments: {
   targetType: "proposal",
   targetUuid: "<proposal-uuid>",
   content: "Specific feedback:\n1. Add error scenarios to PRD\n2. Task 3 AC should include performance benchmarks"
-})
+} })
 ```
 
 ### Workflow A2: Revoking Approved Proposals
@@ -194,10 +194,10 @@ chorus_add_comment({
 If an approved Proposal's direction turns out to be wrong, use `chorus_pm_revoke_proposal` to undo the approval. Unlike `reject` (which acts on pending proposals), `revoke` acts on already-approved proposals and rolls back all materialized resources.
 
 ```
-chorus_pm_revoke_proposal({
+chorus_tool_execute({ toolName: "chorus_pm_revoke_proposal", arguments: {
   proposalUuid: "<proposal-uuid>",
   reviewNote: "Requirements changed — original approach no longer viable."
-})
+} })
 ```
 
 Cascade effects: all materialized Tasks are closed, all materialized Documents are deleted, and related AcceptanceCriteria/TaskDependencies/SessionCheckins are cleaned up. The Proposal returns to `draft` status so the PM can revise and resubmit.
@@ -207,7 +207,7 @@ Cascade effects: all materialized Tasks are closed, all materialized Documents a
 #### B1: Review the Submitted Task
 
 ```
-chorus_get_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<task-uuid>" } })
 ```
 
 Check: developer's work summary, acceptance criteria, self-check results.
@@ -215,7 +215,7 @@ Check: developer's work summary, acceptance criteria, self-check results.
 #### B2: Read Comments and Work Reports
 
 ```
-chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "task", targetUuid: "<task-uuid>" } })
 ```
 
 #### B2.5: Independent Review
@@ -230,14 +230,14 @@ Use the gated reviewer result from `chorus_submit_for_verify`, or read the lates
 Review and mark each criterion:
 
 ```
-chorus_mark_acceptance_criteria({
+chorus_tool_execute({ toolName: "chorus_mark_acceptance_criteria", arguments: {
   taskUuid: "<task-uuid>",
   criteria: [
     { uuid: "<criterion-uuid>", status: "passed" },
     { uuid: "<criterion-uuid>", status: "passed" },
     { uuid: "<criterion-uuid>", status: "failed", evidence: "Missing edge case handling" }
   ]
-})
+} })
 ```
 
 #### B4: Verify or Reopen
@@ -245,13 +245,13 @@ chorus_mark_acceptance_criteria({
 **Verify (all required AC passed):**
 
 ```
-chorus_admin_verify_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_verify_task", arguments: { taskUuid: "<task-uuid>" } })
 ```
 
 This moves the task to `done`. **Important:** verifying may unblock downstream tasks. Check:
 
 ```
-chorus_get_unblocked_tasks({ projectUuid: "<project-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_unblocked_tasks", arguments: { projectUuid: "<project-uuid>" } })
 ```
 
 If new tasks are unblocked, assign them or notify developers.
@@ -259,13 +259,13 @@ If new tasks are unblocked, assign them or notify developers.
 **Reopen (needs fixes):**
 
 ```
-chorus_admin_reopen_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_reopen_task", arguments: { taskUuid: "<task-uuid>" } })
 
-chorus_add_comment({
+chorus_tool_execute({ toolName: "chorus_add_comment", arguments: {
   targetType: "task",
   targetUuid: "<task-uuid>",
   content: "Reopened: Missing error handling for user-not-found edge case."
-})
+} })
 ```
 
 The task returns to `in_progress`. All acceptance criteria are reset.
@@ -274,10 +274,10 @@ The task returns to `in_progress`. All acceptance criteria are reset.
 
 ```
 # Close (preserves history)
-chorus_admin_close_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_close_task", arguments: { taskUuid: "<task-uuid>" } })
 
 # Delete (permanent, use sparingly)
-chorus_admin_delete_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_delete_task", arguments: { taskUuid: "<task-uuid>" } })
 ```
 
 ### Workflow C: Project & Idea Management
@@ -285,28 +285,28 @@ chorus_admin_delete_task({ taskUuid: "<task-uuid>" })
 #### Create Project
 
 ```
-chorus_get_project_groups()  # List available groups first
-chorus_admin_create_project({
+chorus_tool_execute({ toolName: "chorus_get_project_groups", arguments: {} })  # List available groups first
+chorus_tool_execute({ toolName: "chorus_admin_create_project", arguments: {
   name: "My Project",
   description: "Project goals...",
   groupUuid: "<optional-group-uuid>"
-})
+} })
 ```
 
 #### Manage Project Groups
 
 ```
-chorus_admin_create_project_group({ name: "Mobile Apps", description: "All mobile projects" })
-chorus_admin_move_project_to_group({ projectUuid: "<uuid>", groupUuid: "<uuid>" })
-chorus_admin_move_project_to_group({ projectUuid: "<uuid>", groupUuid: null })  # Ungroup
-chorus_admin_delete_project_group({ groupUuid: "<uuid>" })  # Projects become ungrouped
+chorus_tool_execute({ toolName: "chorus_admin_create_project_group", arguments: { name: "Mobile Apps", description: "All mobile projects" } })
+chorus_tool_execute({ toolName: "chorus_admin_move_project_to_group", arguments: { projectUuid: "<uuid>", groupUuid: "<uuid>" } })
+chorus_tool_execute({ toolName: "chorus_admin_move_project_to_group", arguments: { projectUuid: "<uuid>", groupUuid: null } })  # Ungroup
+chorus_tool_execute({ toolName: "chorus_admin_delete_project_group", arguments: { groupUuid: "<uuid>" } })  # Projects become ungrouped
 ```
 
 #### Close / Delete Ideas
 
 ```
-chorus_admin_close_idea({ ideaUuid: "<idea-uuid>" })
-chorus_admin_delete_idea({ ideaUuid: "<idea-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_close_idea", arguments: { ideaUuid: "<idea-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_admin_delete_idea", arguments: { ideaUuid: "<idea-uuid>" } })
 ```
 
 > **Note:** Creating ideas is a PM tool (`chorus_pm_create_idea`). See `chorus-idea`.
@@ -316,17 +316,17 @@ chorus_admin_delete_idea({ ideaUuid: "<idea-uuid>" })
 Use OpenCode's native `write` / `edit` tools when preparing updated document files for upload.
 
 ```
-chorus_admin_delete_document({ documentUuid: "<doc-uuid>" })
+chorus_tool_execute({ toolName: "chorus_admin_delete_document", arguments: { documentUuid: "<doc-uuid>" } })
 # Write the updated content to the Chorus staging directory first, then:
-chorus_pm_update_document({ documentUuid: "<doc-uuid>", contentPath: "<chorus-staging-dir>/updated.md" })
+chorus_tool_execute({ toolName: "chorus_pm_update_document", arguments: { documentUuid: "<doc-uuid>", contentPath: "<chorus-staging-dir>/updated.md" } })
 ```
 
 ---
 
 ## Daily Admin Routine
 
-1. **Check in** — `chorus_checkin()`
-2. **Review activity** — `chorus_get_activity()` for recent events
+1. **Check in** — `chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })`
+2. **Review activity** — `chorus_tool_execute({ toolName: "chorus_get_activity", arguments: {} })` for recent events
 3. **Process proposals** — Review and approve/reject pending proposals
 4. **Verify tasks** — Review and verify/reopen tasks in `to_verify`
 5. **Create new ideas** — If the human has new requirements

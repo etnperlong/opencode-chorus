@@ -86,13 +86,13 @@ Elaboration resolved --> Create Proposal --> Add drafts --> Validate --> Submit 
 If the project is known to use OpenSpec, run Step 1.5 first so the proposal description can include `OpenSpec change slug: <slug>`.
 
 ```
-chorus_pm_create_proposal({
+chorus_tool_execute({ toolName: "chorus_pm_create_proposal", arguments: {
   projectUuid: "<project-uuid>",
   title: "Implement <feature name>",
   description: "Analysis and implementation plan for Idea #xxx",
   inputType: "idea",
   inputUuids: ["<idea-uuid>"]
-})
+} })
 ```
 
 **Multiple Ideas:** You can combine multiple ideas into one proposal by passing multiple UUIDs in `inputUuids`.
@@ -126,20 +126,20 @@ Write each document to a file in the Chorus staging directory first, then add it
 
 ```
 # Write the PRD to the staging directory first (use the injected <chorus-staging-dir> path), then:
-chorus_pm_add_document_draft({
+chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   type: "prd",
   title: "PRD: <Feature Name>",
   contentPath: "<chorus-staging-dir>/prd.md"
-})
+} })
 
 # Write the Tech Design first, then:
-chorus_pm_add_document_draft({
+chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   type: "tech_design",
   title: "Tech Design: <Feature Name>",
   contentPath: "<chorus-staging-dir>/design.md"
-})
+} })
 ```
 
 **Document types:** `prd`, `tech_design`, `adr`, `spec`, `guide`
@@ -150,7 +150,7 @@ Add task drafts one at a time. The response returns the new draft's `draftUuid` 
 
 ```
 # First task -> response includes { draftUuid, draftTitle }
-chorus_pm_add_task_draft({
+chorus_tool_execute({ toolName: "chorus_pm_add_task_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   title: "Implement <component>",
   description: "Detailed description of what to build...",
@@ -160,10 +160,10 @@ chorus_pm_add_task_draft({
     { description: "Criteria 1", required: true },
     { description: "Criteria 2", required: true }
   ]
-})
+} })
 
 # Second task — depends on first
-chorus_pm_add_task_draft({
+chorus_tool_execute({ toolName: "chorus_pm_add_task_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   title: "Write tests for <component>",
   description: "Unit and integration tests...",
@@ -173,7 +173,7 @@ chorus_pm_add_task_draft({
     { description: "Test coverage > 80%", required: true }
   ],
   dependsOnDraftUuids: ["<draftUuid-from-first-task>"]
-})
+} })
 ```
 
 Prefer `acceptanceCriteriaItems` for all new task drafts. Legacy Markdown `acceptanceCriteria` may exist in older proposals, but structured criteria are the current format and support self-checking.
@@ -184,23 +184,23 @@ Prefer `acceptanceCriteriaItems` for all new task drafts. Legacy Markdown `accep
 
 ```
 # Review current state
-chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
+chorus_tool_execute({ toolName: "chorus_get_proposal", arguments: { proposalUuid: "<proposal-uuid>", section: "full" } })
 
 # Update a document draft — write the updated content to a staging file first, then:
-chorus_pm_update_document_draft({
+chorus_tool_execute({ toolName: "chorus_pm_update_document_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   draftUuid: "<draft-uuid>",
   contentPath: "<chorus-staging-dir>/prd.md"
-})
+} })
 
 # Update task draft acceptance criteria in structured form:
-chorus_pm_update_task_draft({
+chorus_tool_execute({ toolName: "chorus_pm_update_task_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   draftUuid: "<task-draft-uuid>",
   acceptanceCriteriaItems: [
     { description: "Updated criterion", required: true }
   ]
-})
+} })
 ```
 
 ### Step 5: Validate and Submit
@@ -208,7 +208,7 @@ chorus_pm_update_task_draft({
 Before submitting, validate to preview issues:
 
 ```
-chorus_pm_validate_proposal({ proposalUuid: "<proposal-uuid>" })
+chorus_tool_execute({ toolName: "chorus_pm_validate_proposal", arguments: { proposalUuid: "<proposal-uuid>" } })
 ```
 
 Returns `{ valid, issues }` with error, warning, and info levels. Fix errors before submitting.
@@ -216,7 +216,7 @@ Returns `{ valid, issues }` with error, warning, and info levels. Fix errors bef
 When validation passes:
 
 ```
-chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
+chorus_tool_execute({ toolName: "chorus_pm_submit_proposal", arguments: { proposalUuid: "<proposal-uuid>" } })
 ```
 
 This changes the status from `draft` to `pending`. An Admin will review it (see `chorus-review`).
@@ -224,11 +224,11 @@ This changes the status from `draft` to `pending`. An Admin will review it (see 
 Add a comment explaining your reasoning:
 
 ```
-chorus_add_comment({
+chorus_tool_execute({ toolName: "chorus_add_comment", arguments: {
   targetType: "proposal",
   targetUuid: "<proposal-uuid>",
   content: "This proposal covers... Key decisions: ..."
-})
+} })
 ```
 
 ### Step 6: Handle Feedback
@@ -239,29 +239,29 @@ After submission in OpenCode, the plugin auto-launches `proposal-reviewer` when 
 
 1. **Read feedback:**
    ```
-   chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
-   chorus_get_comments({ targetType: "proposal", targetUuid: "<proposal-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_proposal", arguments: { proposalUuid: "<proposal-uuid>", section: "full" } })
+   chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "proposal", targetUuid: "<proposal-uuid>" } })
    ```
    Identify BLOCKERs from the reviewer VERDICT or rejection note.
 
 2. **Reject the proposal** (self-reject your own, or ask admin to reject someone else's):
    ```
-   chorus_pm_reject_proposal({
+   chorus_tool_execute({ toolName: "chorus_pm_reject_proposal", arguments: {
      proposalUuid: "<proposal-uuid>",
      reviewNote: "Reviewer FAIL. Fixing BLOCKERs: <list>"
-   })
+   } })
    ```
    This returns the proposal to `draft` status. PM agents can only reject their own proposals; admin agents can reject any proposal.
 
 3. **Revise the drafts** (write updated content to staging files first, then upload via `contentPath`):
    ```
-   chorus_pm_update_document_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", contentPath: "<chorus-staging-dir>/prd.md" })
-   chorus_pm_update_task_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", ... })
+   chorus_tool_execute({ toolName: "chorus_pm_update_document_draft", arguments: { proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", contentPath: "<chorus-staging-dir>/prd.md" } })
+   chorus_tool_execute({ toolName: "chorus_pm_update_task_draft", arguments: { proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", ... } })
    ```
 
 4. **Resubmit:**
    ```
-   chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_pm_submit_proposal", arguments: { proposalUuid: "<proposal-uuid>" } })
    ```
 
 ### Step 7: Post-Approval
@@ -278,21 +278,21 @@ After tasks are created, you can manage dependencies:
 **Batch create tasks with intra-batch dependencies:**
 
 ```
-chorus_create_tasks({
+chorus_tool_execute({ toolName: "chorus_create_tasks", arguments: {
   projectUuid: "<project-uuid>",
   tasks: [
     { draftUuid: "draft-db", title: "Create database schema", priority: "high", storyPoints: 2 },
     { draftUuid: "draft-api", title: "Implement API endpoints", priority: "high", storyPoints: 4, dependsOnDraftUuids: ["draft-db"] },
     { title: "Write integration tests", priority: "medium", storyPoints: 2, dependsOnDraftUuids: ["draft-api"] }
   ]
-})
+} })
 ```
 
 **Add/remove dependencies on existing tasks:**
 
 ```
-chorus_update_task({ taskUuid: "<task-B-uuid>", addDependsOn: ["<task-A-uuid>"] })
-chorus_update_task({ taskUuid: "<task-B-uuid>", removeDependsOn: ["<task-A-uuid>"] })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-B-uuid>", addDependsOn: ["<task-A-uuid>"] } })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-B-uuid>", removeDependsOn: ["<task-A-uuid>"] } })
 ```
 
 Dependencies are validated: same project, no self-dependency, no cycles (DFS detection).
@@ -300,7 +300,7 @@ Dependencies are validated: same project, no self-dependency, no cycles (DFS det
 ### Step 9: Assign Tasks to Agents With `task:write` (Optional)
 
 ```
-chorus_pm_assign_task({ taskUuid: "<task-uuid>", agentUuid: "<developer-agent-uuid>" })
+chorus_tool_execute({ toolName: "chorus_pm_assign_task", arguments: { taskUuid: "<task-uuid>", agentUuid: "<developer-agent-uuid>" } })
 ```
 
 - Task must be `open` or `assigned`

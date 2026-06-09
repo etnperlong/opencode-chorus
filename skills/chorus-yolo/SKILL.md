@@ -80,7 +80,7 @@ Sub-agents share the same API key as the main agent. The plugin injects session 
 **Check at startup:**
 
 ```
-result = chorus_checkin()
+result = chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 permissions = result.agent.permissions ?? {}
 
 hasPermission(resource, action) =
@@ -127,40 +127,40 @@ Parse the arguments for `--project <uuid>`.
 
 **If `--project` is provided:**
 ```
-chorus_get_project({ projectUuid: "<uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_project", arguments: { projectUuid: "<uuid>" } })
 ```
 Verify it exists and proceed.
 
 **If not provided**, search for a suitable existing project first:
 ```
 # 1. Search for projects matching the prompt topic
-chorus_search({ query: "<key terms from prompt>", entityTypes: ["project"] })
+chorus_tool_execute({ toolName: "chorus_search", arguments: { query: "<key terms from prompt>", entityTypes: ["project"] } })
 
 # 2. Or list recent projects to find a match
-chorus_list_projects()
+chorus_tool_execute({ toolName: "chorus_list_projects", arguments: {} })
 ```
 
 Review the results. If a project clearly matches the user's intent (same topic, active, relevant scope), use it. If no suitable project exists, create a new one:
 ```
-chorus_admin_create_project({
+chorus_tool_execute({ toolName: "chorus_admin_create_project", arguments: {
   name: "<short title derived from prompt>",
   description: "<1-2 sentence summary of the prompt>"
-})
+} })
 ```
 
 #### Step 1.2: Create Idea
 
 ```
-chorus_pm_create_idea({
+chorus_tool_execute({ toolName: "chorus_pm_create_idea", arguments: {
   projectUuid: "<project-uuid>",
   title: "<concise title derived from prompt>",
   content: "<full user prompt as-is>"
-})
+} })
 ```
 
 Then claim it:
 ```
-chorus_claim_idea({ ideaUuid: "<idea-uuid>" })
+chorus_tool_execute({ toolName: "chorus_claim_idea", arguments: { ideaUuid: "<idea-uuid>" } })
 ```
 
 #### Step 1.3: Self-Elaboration
@@ -169,7 +169,7 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
 
 1. **Generate and submit questions:**
    ```
-   chorus_pm_start_elaboration({
+   chorus_tool_execute({ toolName: "chorus_pm_start_elaboration", arguments: {
      ideaUuid: "<idea-uuid>",
      depth: "standard",
      questions: [
@@ -184,27 +184,27 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
        }
        // ... 5-8 questions covering functional, technical, scope aspects
      ]
-   })
+   } })
    ```
 
 2. **Answer immediately** (agent selects best options based on the prompt):
    ```
-   chorus_answer_elaboration({
+   chorus_tool_execute({ toolName: "chorus_answer_elaboration", arguments: {
      ideaUuid: "<idea-uuid>",
      answers: [
        { questionId: "q1", selectedOptionId: "a", customText: "Rationale: ..." },
        // ...
      ]
-   })
+   } })
    ```
 
    In the normal self-elaboration path there is one active round, so `roundUuid` can be omitted and auto-located.
 
 3. **Validate** (no issues in self-mode):
    ```
-   chorus_pm_validate_elaboration({
+   chorus_tool_execute({ toolName: "chorus_pm_validate_elaboration", arguments: {
      ideaUuid: "<idea-uuid>"
-   })
+   } })
    ```
 
 #### Step 1.4: Create Proposal
@@ -216,13 +216,13 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
 
 2. **Create empty container:**
    ```
-   chorus_pm_create_proposal({
+   chorus_tool_execute({ toolName: "chorus_pm_create_proposal", arguments: {
      projectUuid: "<project-uuid>",
      title: "<feature name>",
      description: "<summary of what the proposal covers>" + (openspecMode ? "\n\nOpenSpec change slug: <slug>" : ""),
      inputType: "idea",
      inputUuids: ["<idea-uuid>"]
-   })
+   } })
    ```
 
 3. **OpenSpec mode: author local files and mirror:**
@@ -238,24 +238,24 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
 
    Mirror documents to Chorus by passing local file paths via `contentPath` — do not re-output the file bodies inline:
     ```
-    chorus_pm_add_document_draft({
+    chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
       proposalUuid: "<proposal-uuid>",
       type: "prd",
       title: "PRD: <feature>",
       contentPath: "openspec/changes/<slug>/proposal.md"
-    })
-    chorus_pm_add_document_draft({
+    } })
+    chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
       proposalUuid: "<proposal-uuid>",
       type: "tech_design",
       title: "Tech Design: <feature>",
       contentPath: "openspec/changes/<slug>/design.md"
-    })
-    chorus_pm_add_document_draft({
+    } })
+    chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
       proposalUuid: "<proposal-uuid>",
       type: "spec",
       title: "Spec: <capability>",
       contentPath: "openspec/changes/<slug>/specs/<capability>/spec.md"
-    })
+    } })
     ```
 
    Convert `tasks.md` into task drafts using `chorus_pm_add_task_draft`, preserving dependencies.
@@ -264,18 +264,18 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
    Use OpenCode's native `write` / `edit` tools for the staging file instead of bash-based file writes whenever possible.
    ```
    # Write the tech design content to a file in <chorus-staging-dir> first, then:
-   chorus_pm_add_document_draft({
+   chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
      proposalUuid: "<proposal-uuid>",
      type: "tech_design",
      title: "Tech Design: <feature>",
      contentPath: "<chorus-staging-dir>/design.md"
-   })
+   } })
    ```
 
 5. **Add task drafts incrementally** (use returned `draftUuid` for dependency chaining):
    ```
    # First task
-   result1 = chorus_pm_add_task_draft({
+   result1 = chorus_tool_execute({ toolName: "chorus_pm_add_task_draft", arguments: {
      proposalUuid: "<proposal-uuid>",
      title: "<module name>",
      description: "<what to build, referencing tech design>",
@@ -285,10 +285,10 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
        { description: "<testable criterion>", required: true },
        // ...
      ]
-   })
+   } })
 
    # Second task, depends on first
-   chorus_pm_add_task_draft({
+   chorus_tool_execute({ toolName: "chorus_pm_add_task_draft", arguments: {
      proposalUuid: "<proposal-uuid>",
      title: "<dependent module>",
      description: "...",
@@ -296,18 +296,18 @@ In `chorus-yolo` mode, the agent generates elaboration questions and answers the
      storyPoints: 2,
      acceptanceCriteriaItems: [...],
      dependsOnDraftUuids: ["<result1.draftUuid>"]
-   })
+   } })
    ```
 
 6. **Validate:**
    ```
-   chorus_pm_validate_proposal({ proposalUuid: "<proposal-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_pm_validate_proposal", arguments: { proposalUuid: "<proposal-uuid>" } })
    ```
    Fix any errors, then proceed.
 
 7. **Submit:**
    ```
-   chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_pm_submit_proposal", arguments: { proposalUuid: "<proposal-uuid>" } })
    ```
    After this call, the plugin auto-launches `proposal-reviewer` as a child sub-agent and waits for its current VERDICT or timeout before returning the tool result.
 
@@ -319,7 +319,7 @@ After `chorus_pm_submit_proposal`, the plugin auto-launches `proposal-reviewer` 
 
 1. **Read the reviewer's VERDICT:**
    ```
-   chorus_get_comments({ targetType: "proposal", targetUuid: "<proposal-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "proposal", targetUuid: "<proposal-uuid>" } })
    ```
    Look for the most recent comment containing `VERDICT:`.
 
@@ -327,29 +327,29 @@ After `chorus_pm_submit_proposal`, the plugin auto-launches `proposal-reviewer` 
 
    - **PASS** or **PASS WITH NOTES** --
      ```
-     chorus_admin_approve_proposal({
+     chorus_tool_execute({ toolName: "chorus_admin_approve_proposal", arguments: {
        proposalUuid: "<proposal-uuid>",
        reviewNote: "PASS from reviewer. <brief summary of notes if any>"
-     })
+     } })
      ```
      Tasks and documents materialize automatically. Proceed to Phase 3.
 
    - **FAIL** --
      Read the BLOCKERs from the reviewer comment. Then:
      ```
-     chorus_pm_reject_proposal({
+     chorus_tool_execute({ toolName: "chorus_pm_reject_proposal", arguments: {
        proposalUuid: "<proposal-uuid>",
        reviewNote: "FAIL from reviewer. Fixing BLOCKERs: <list>"
-     })
+     } })
      ```
        Revise the drafts (write updated content to staging files first, then upload via `contentPath`):
       ```
-      chorus_pm_update_document_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", contentPath: "<chorus-staging-dir>/design.md" })
-      chorus_pm_update_task_draft({ proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", ... })
+      chorus_tool_execute({ toolName: "chorus_pm_update_document_draft", arguments: { proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", contentPath: "<chorus-staging-dir>/design.md" } })
+      chorus_tool_execute({ toolName: "chorus_pm_update_task_draft", arguments: { proposalUuid: "<proposal-uuid>", draftUuid: "<uuid>", ... } })
       ```
       Then resubmit:
       ```
-      chorus_pm_submit_proposal({ proposalUuid: "<proposal-uuid>" })
+      chorus_tool_execute({ toolName: "chorus_pm_submit_proposal", arguments: { proposalUuid: "<proposal-uuid>" } })
       ```
       After resubmission, the plugin auto-launches and waits for the Round 2 reviewer gate.
 
@@ -373,7 +373,7 @@ wave = 1
 
 loop:
   # 1. Find ready tasks
-  unblocked = chorus_get_unblocked_tasks({ projectUuid: "<project-uuid>" })
+  unblocked = chorus_tool_execute({ toolName: "chorus_get_unblocked_tasks", arguments: { projectUuid: "<project-uuid>" } })
 
   if no unblocked tasks and all tasks done:
     break  # All complete
@@ -413,14 +413,14 @@ If OpenCode subagents are not available, permission is denied, or sub-agents cra
 ```
 for each task in unblocked:
   # Follow the chorus-develop workflow directly as main agent
-  chorus_claim_task({ taskUuid: "<task-uuid>" })
-  chorus_update_task({ taskUuid: "<task-uuid>", status: "in_progress" })
+  chorus_tool_execute({ toolName: "chorus_claim_task", arguments: { taskUuid: "<task-uuid>" } })
+  chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-uuid>", status: "in_progress" } })
 
   # ... implement the task: read context, write code, run tests ...
 
-  chorus_report_work({ taskUuid: "<task-uuid>", report: "..." })
-  chorus_report_criteria_self_check({ taskUuid: "<task-uuid>", criteria: [...] })
-  chorus_submit_for_verify({ taskUuid: "<task-uuid>", summary: "..." })
+  chorus_tool_execute({ toolName: "chorus_report_work", arguments: { taskUuid: "<task-uuid>", report: "..." } })
+  chorus_tool_execute({ toolName: "chorus_report_criteria_self_check", arguments: { taskUuid: "<task-uuid>", criteria: [...] } })
+  chorus_tool_execute({ toolName: "chorus_submit_for_verify", arguments: { taskUuid: "<task-uuid>", summary: "..." } })
 
   # submit_for_verify auto-launches task-reviewer and gates on its current VERDICT or timeout
   # Proceed to Phase 4 verification for this task before moving to next
@@ -437,37 +437,37 @@ After each wave's sub-agents complete, verify their tasks:
 ```
 for each task in wave_tasks:
   # 1. Check task status
-  task = chorus_get_task({ taskUuid: "<task-uuid>" })
+  task = chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<task-uuid>" } })
 
   if task.status != "to_verify":
     # Sub-agent may have failed; skip or handle
     continue
 
   # 2. Read task-reviewer VERDICT from the gated submit_for_verify result or comments
-  comments = chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
+  comments = chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "task", targetUuid: "<task-uuid>" } })
   # Find the most recent comment containing "VERDICT:"
 
   # 3. Act on VERDICT — three possible outcomes:
   if VERDICT is "PASS":
     # All AC verified, no issues. Mark AC and verify.
-    chorus_mark_acceptance_criteria({
+    chorus_tool_execute({ toolName: "chorus_mark_acceptance_criteria", arguments: {
       taskUuid: "<task-uuid>",
       criteria: [
         { uuid: "<ac-uuid>", status: "passed", evidence: "<from reviewer>" },
         // ...
       ]
-    })
-    chorus_admin_verify_task({ taskUuid: "<task-uuid>" })
+    } })
+    chorus_tool_execute({ toolName: "chorus_admin_verify_task", arguments: { taskUuid: "<task-uuid>" } })
     # Task is now "done" -- unblocks dependents
 
   if VERDICT is "PASS WITH NOTES":
     # All AC verified, minor non-blocking notes. Still mark AC and verify.
-    chorus_mark_acceptance_criteria({ ... })
-    chorus_admin_verify_task({ taskUuid: "<task-uuid>" })
+    chorus_tool_execute({ toolName: "chorus_mark_acceptance_criteria", arguments: { ... } })
+    chorus_tool_execute({ toolName: "chorus_admin_verify_task", arguments: { taskUuid: "<task-uuid>" } })
 
   if VERDICT is "FAIL":
     # BLOCKERs found. Do NOT verify. Reopen for rework.
-    chorus_admin_reopen_task({ taskUuid: "<task-uuid>" })
+    chorus_tool_execute({ toolName: "chorus_admin_reopen_task", arguments: { taskUuid: "<task-uuid>" } })
     # Task returns to "open", will be picked up in next wave
 ```
 

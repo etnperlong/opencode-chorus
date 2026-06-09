@@ -81,7 +81,7 @@ Main agent / Team Lead: call these tools without `sessionUuid` — no session ne
 ### Step 1: Check In
 
 ```
-chorus_checkin()
+chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
 ```
 
 Review your persona, current assignments, and pending work counts.
@@ -95,20 +95,20 @@ If you are a **sub-agent**, the opencode-chorus plugin automatically creates you
 ### Step 2: Find Work
 
 ```
-chorus_get_available_tasks({ projectUuid: "<project-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_available_tasks", arguments: { projectUuid: "<project-uuid>" } })
 ```
 
 Or check existing assignments:
 
 ```
-chorus_get_my_assignments()
+chorus_tool_execute({ toolName: "chorus_get_my_assignments", arguments: {} })
 ```
 
 ### Step 3: Claim a Task
 
 ```
-chorus_get_task({ taskUuid: "<task-uuid>" })  # Review first
-chorus_claim_task({ taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<task-uuid>" } })  # Review first
+chorus_tool_execute({ toolName: "chorus_claim_task", arguments: { taskUuid: "<task-uuid>" } })
 ```
 
 Check: description, acceptance criteria, priority, story points, related proposal/documents.
@@ -119,54 +119,54 @@ Each task and proposal includes a `commentCount` field — use it to decide whic
 
 1. **Read the task** and identify dependencies:
    ```
-   chorus_get_task({ taskUuid: "<task-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<task-uuid>" } })
    ```
    Pay attention to `dependsOn` (upstream tasks) and `commentCount`.
 
 2. **Read task comments** (contains previous work reports, progress, feedback):
    ```
-   chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "task", targetUuid: "<task-uuid>" } })
    ```
 
 3. **Review upstream dependency tasks** — your work likely builds on theirs:
    ```
-   chorus_get_task({ taskUuid: "<dependency-task-uuid>" })
-   chorus_get_comments({ targetType: "task", targetUuid: "<dependency-task-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<dependency-task-uuid>" } })
+   chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "task", targetUuid: "<dependency-task-uuid>" } })
    ```
    Look for: files created, API contracts, interfaces, trade-offs.
 
 4. **Read the originating proposal** for design intent:
     ```
-    chorus_get_proposal({ proposalUuid: "<proposal-uuid>", section: "full" })
+    chorus_tool_execute({ toolName: "chorus_get_proposal", arguments: { proposalUuid: "<proposal-uuid>", section: "full" } })
     ```
 
    Use `section: "full"` when you need the complete proposal, including document and task draft content. Use `section: "documents"` or `section: "tasks"` if only one side is needed.
 
    If the proposal description or comments include `OpenSpec change slug: <slug>`, treat local OpenSpec files as the document source of truth. When implementation reveals a required document update:
     - In the OpenSpec change directory for `<slug>`, update `proposal.md`, `design.md`, or `specs/**/spec.md` first.
-    - Then mirror the updated local file back to Chorus using `contentPath`. Prefer OpenCode's native `write` / `edit` tools over bash-based file writes when updating that local file. For draft proposals, use `chorus_pm_update_document_draft({ ..., contentPath: "<path>" })`; for approved documents, use the available document update/governance path or create a follow-up proposal if the change alters approved scope.
+    - Then mirror the updated local file back to Chorus using `contentPath`. Prefer OpenCode's native `write` / `edit` tools over bash-based file writes when updating that local file. For draft proposals, use `chorus_tool_execute({ toolName: "chorus_pm_update_document_draft", arguments: { ..., contentPath: "<path>" } })`; for approved documents, use the available document update/governance path or create a follow-up proposal if the change alters approved scope.
     - Do not update Chorus docs without updating the local OpenSpec artifact first.
     - Add a task comment if the mirror sync is blocked or requires PM/admin input.
 
 5. **Read project documents** (PRD, tech design, ADR):
     ```
-   chorus_get_documents({ projectUuid: "<project-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_documents", arguments: { projectUuid: "<project-uuid>" } })
    ```
 
 ### Step 5: Start Working
 
 **Sub-agent**: checkin to the task first:
 ```
-chorus_session_checkin_task({ sessionUuid: "<session-uuid>", taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_session_checkin_task", arguments: { sessionUuid: "<session-uuid>", taskUuid: "<task-uuid>" } })
 ```
 
 Then mark as in-progress:
 ```
 # Sub-agent:
-chorus_update_task({ taskUuid: "<task-uuid>", status: "in_progress", sessionUuid: "<session-uuid>" })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-uuid>", status: "in_progress", sessionUuid: "<session-uuid>" } })
 
 # Main agent:
-chorus_update_task({ taskUuid: "<task-uuid>", status: "in_progress" })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<task-uuid>", status: "in_progress" } })
 ```
 
 > **Dependency enforcement**: If this task has unresolved dependencies (dependsOn tasks not in `done` or `closed`), the call will be rejected with detailed blocker info. Use `chorus_get_unblocked_tasks` to find tasks you can start now.
@@ -181,21 +181,21 @@ Report periodically with `chorus_report_work`. Include:
 - Blockers or questions
 
 ```
-chorus_report_work({
+chorus_tool_execute({ toolName: "chorus_report_work", arguments: {
   taskUuid: "<task-uuid>",
   report: "Progress:\n- Created src/services/auth.service.ts\n- Commit: abc1234\n- Remaining: unit tests",
   sessionUuid: "<session-uuid>"
-})
+} })
 ```
 
 Report with status update when complete:
 ```
-chorus_report_work({
+chorus_tool_execute({ toolName: "chorus_report_work", arguments: {
   taskUuid: "<task-uuid>",
   report: "All implementation complete:\n- Files: ...\n- PR: https://github.com/org/repo/pull/42\n- All tests passing",
   status: "to_verify",
   sessionUuid: "<session-uuid>"
-})
+} })
 ```
 
 ### Step 7: Self-Check Acceptance Criteria
@@ -203,16 +203,16 @@ chorus_report_work({
 Before submitting, check structured acceptance criteria:
 
 ```
-task = chorus_get_task({ taskUuid: "<task-uuid>" })
+task = chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<task-uuid>" } })
 
 # If task.acceptanceCriteriaItems is non-empty:
-chorus_report_criteria_self_check({
+chorus_tool_execute({ toolName: "chorus_report_criteria_self_check", arguments: {
   taskUuid: "<task-uuid>",
   criteria: [
     { uuid: "<criterion-uuid>", devStatus: "passed", devEvidence: "Unit tests cover this" },
     { uuid: "<criterion-uuid>", devStatus: "passed", devEvidence: "Verified manually" }
   ]
-})
+} })
 ```
 
 > For **required** criteria, keep working until you can self-check as `passed`. Only use `failed` for **optional** criteria that are out of scope.
@@ -221,15 +221,15 @@ chorus_report_criteria_self_check({
 
 **Sub-agents** — checkout first:
 ```
-chorus_session_checkout_task({ sessionUuid: "<session-uuid>", taskUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_session_checkout_task", arguments: { sessionUuid: "<session-uuid>", taskUuid: "<task-uuid>" } })
 ```
 
 Then submit:
 ```
-chorus_submit_for_verify({
+chorus_tool_execute({ toolName: "chorus_submit_for_verify", arguments: {
   taskUuid: "<task-uuid>",
   summary: "Implemented auth feature:\n- Added login/logout endpoints\n- JWT middleware\n- 95% test coverage\n- All AC self-checked (3/3 passed)"
-})
+} })
 ```
 
 > `to_verify` does NOT unblock downstream tasks — only `done` (after admin verification) does.
@@ -238,7 +238,7 @@ chorus_submit_for_verify({
 
 After the gated reviewer result returns, read its VERDICT from the tool result or comments:
 ```
-chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "task", targetUuid: "<task-uuid>" } })
 ```
 Find the most recent comment containing `VERDICT:` and act on it:
 
@@ -256,8 +256,8 @@ If the reviewer returns **FAIL**, or the task is reopened after verification:
 
 1. Check feedback:
    ```
-   chorus_get_task({ taskUuid: "<task-uuid>" })
-   chorus_get_comments({ targetType: "task", targetUuid: "<task-uuid>" })
+   chorus_tool_execute({ toolName: "chorus_get_task", arguments: { taskUuid: "<task-uuid>" } })
+   chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "task", targetUuid: "<task-uuid>" } })
    ```
 2. Fix every BLOCKER listed in the reviewer's FAIL comment.
 3. Checkin again, fix issues, report fixes, resubmit.
@@ -280,8 +280,8 @@ If the task you just submitted or helped finish appears to be the **last remaini
 
 The opencode-chorus plugin **fully automates** session lifecycle — creation, heartbeat, and cleanup are all handled by hooks. Sub-agents only do 3 things manually:
 
-1. `chorus_session_checkin_task({ sessionUuid, taskUuid })` — before starting work
-2. `chorus_session_checkout_task({ sessionUuid, taskUuid })` — when done (recommended; plugin also auto-checkouts on exit)
+1. `chorus_tool_execute({ toolName: "chorus_session_checkin_task", arguments: { sessionUuid, taskUuid } })` — before starting work
+2. `chorus_tool_execute({ toolName: "chorus_session_checkout_task", arguments: { sessionUuid, taskUuid } })` — when done (recommended; plugin also auto-checkouts on exit)
 3. Pass `sessionUuid` to `chorus_update_task` and `chorus_report_work` for attribution
 
 **Main agent / Team Lead**: no session needed — call tools without `sessionUuid`.
@@ -303,8 +303,8 @@ When using OpenCode subagents to run multiple sub-agents in parallel, Chorus pro
 
 ```
 # 1. Check in and plan
-chorus_checkin()
-chorus_list_tasks({ projectUuid: "<project-uuid>" })
+chorus_tool_execute({ toolName: "chorus_checkin", arguments: {} })
+chorus_tool_execute({ toolName: "chorus_list_tasks", arguments: { projectUuid: "<project-uuid>" } })
 
 # 2. Start an OpenCode multi-agent workflow and spawn sub-agents
 Create or choose an OpenCode multi-agent coordination context for "feature-x".
@@ -326,19 +326,19 @@ The plugin injects session UUID and workflow into the sub-agent's context automa
 
 ```
 # 1. Checkin to task
-chorus_session_checkin_task({ sessionUuid: "<my-session-uuid>", taskUuid: "<my-task-uuid>" })
+chorus_tool_execute({ toolName: "chorus_session_checkin_task", arguments: { sessionUuid: "<my-session-uuid>", taskUuid: "<my-task-uuid>" } })
 
 # 2. Move to in_progress
-chorus_update_task({ taskUuid: "<my-task-uuid>", status: "in_progress", sessionUuid: "<my-session-uuid>" })
+chorus_tool_execute({ toolName: "chorus_update_task", arguments: { taskUuid: "<my-task-uuid>", status: "in_progress", sessionUuid: "<my-session-uuid>" } })
 
 # 3. Do work... code, test, commit...
 
 # 4. Report progress
-chorus_report_work({ taskUuid: "<my-task-uuid>", report: "...", sessionUuid: "<my-session-uuid>" })
+chorus_tool_execute({ toolName: "chorus_report_work", arguments: { taskUuid: "<my-task-uuid>", report: "...", sessionUuid: "<my-session-uuid>" } })
 
 # 5. Checkout and submit
-chorus_session_checkout_task({ sessionUuid: "<my-session-uuid>", taskUuid: "<my-task-uuid>" })
-chorus_submit_for_verify({ taskUuid: "<my-task-uuid>", summary: "..." })
+chorus_tool_execute({ toolName: "chorus_session_checkout_task", arguments: { sessionUuid: "<my-session-uuid>", taskUuid: "<my-task-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_submit_for_verify", arguments: { taskUuid: "<my-task-uuid>", summary: "..." } })
 
 # 6. Notify team lead
 Notify the team lead that the task is complete.
@@ -348,7 +348,7 @@ Notify the team lead that the task is complete.
 
 ### Handling Task Dependencies (DAG)
 
-> **Server-side enforcement**: `chorus_update_task(status: "in_progress")` rejects if any `dependsOn` task is not `done` or `closed`.
+> **Server-side enforcement**: `chorus_tool_execute({ toolName: "chorus_update_task", arguments: { status: "in_progress" } })` rejects if any `dependsOn` task is not `done` or `closed`.
 
 **Wave-based execution (recommended):**
 1. `chorus_get_unblocked_tasks` — find ready tasks
@@ -440,8 +440,8 @@ Release if:
 - You won't finish in a reasonable timeframe
 
 ```
-chorus_release_task({ taskUuid: "<task-uuid>" })
-chorus_add_comment({ targetType: "task", targetUuid: "<task-uuid>", content: "Releasing: reason..." })
+chorus_tool_execute({ toolName: "chorus_release_task", arguments: { taskUuid: "<task-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_add_comment", arguments: { targetType: "task", targetUuid: "<task-uuid>", content: "Releasing: reason..." } })
 ```
 
 ---

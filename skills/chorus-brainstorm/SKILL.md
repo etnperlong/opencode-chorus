@@ -56,12 +56,12 @@ This skill produces one persisted ElaborationRound and then returns control to `
 Before asking the first question, read the current idea and nearby project context:
 
 ```
-chorus_get_idea({ ideaUuid: "<idea-uuid>" })
-chorus_get_documents({ projectUuid: "<project-uuid>" })
-chorus_get_document({ documentUuid: "<document-uuid>" })
-chorus_get_proposals({ projectUuid: "<project-uuid>", status: "approved" })
-chorus_list_tasks({ projectUuid: "<project-uuid>" })
-chorus_get_comments({ targetType: "idea", targetUuid: "<idea-uuid>" })
+chorus_tool_execute({ toolName: "chorus_get_idea", arguments: { ideaUuid: "<idea-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_get_documents", arguments: { projectUuid: "<project-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_get_document", arguments: { documentUuid: "<document-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_get_proposals", arguments: { projectUuid: "<project-uuid>", status: "approved" } })
+chorus_tool_execute({ toolName: "chorus_list_tasks", arguments: { projectUuid: "<project-uuid>" } })
+chorus_tool_execute({ toolName: "chorus_get_comments", arguments: { targetType: "idea", targetUuid: "<idea-uuid>" } })
 ```
 
 Look for: stated goals, constraints, success criteria, and what is still conspicuously missing.
@@ -131,24 +131,24 @@ Turn each material decision into one elaboration question:
 Create the round:
 
 ```
-chorus_pm_start_elaboration({
+chorus_tool_execute({ toolName: "chorus_pm_start_elaboration", arguments: {
   ideaUuid: "<idea-uuid>",
   depth: "standard",
   questions: [
     { id: "q1", text: "...", category: "functional", options: [...] }
   ]
-})
+} })
 ```
 
 Then answer it in one call:
 
 ```
-chorus_answer_elaboration({
+chorus_tool_execute({ toolName: "chorus_answer_elaboration", arguments: {
   ideaUuid: "<idea-uuid>",
   answers: [
     { questionId: "q1", selectedOptionId: "a", customText: "Rationale..." }
   ]
-})
+} })
 ```
 
    Omit `roundUuid` when this is the only active round; Chorus auto-locates it.
@@ -159,7 +159,7 @@ Stop here and return to `chorus-idea`.
 
 `chorus-idea` decides what happens next:
 
-- if the synthesized round is enough, it resolves elaboration with `chorus_pm_validate_elaboration({ ideaUuid })`;
+- if the synthesized round is enough, it resolves elaboration with `chorus_tool_execute({ toolName: "chorus_pm_validate_elaboration", arguments: { ideaUuid } })`;
 - if important gaps remain, it opens a follow-up round with `chorus_pm_start_elaboration`.
 
 ---

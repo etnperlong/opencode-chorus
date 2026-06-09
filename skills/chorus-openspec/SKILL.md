@@ -81,12 +81,12 @@ After local artifacts are written, mirror each file to the Chorus proposal by pa
 For a new draft:
 
 ```
-chorus_pm_add_document_draft({
+chorus_tool_execute({ toolName: "chorus_pm_add_document_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   type: "prd" | "tech_design" | "spec",
   title: "<mapped title>",
   contentPath: "openspec/changes/<slug>/proposal.md"   // or design.md / specs/.../spec.md
-})
+} })
 ```
 
 For task drafts, translate `tasks.md` into `chorus_pm_add_task_draft` calls. Preserve task order, acceptance criteria, and dependency DAG. If a task depends on an earlier task, use the earlier response's `draftUuid` in `dependsOnDraftUuids`.
@@ -105,11 +105,11 @@ Mirror rules:
 If the proposal is still in draft, edit local OpenSpec files first and mirror with `chorus_pm_update_document_draft`:
 
 ```
-chorus_pm_update_document_draft({
+chorus_tool_execute({ toolName: "chorus_pm_update_document_draft", arguments: {
   proposalUuid: "<proposal-uuid>",
   draftUuid: "<draft-uuid>",
   contentPath: "openspec/changes/<slug>/proposal.md"   // path to the updated local file
-})
+} })
 ```
 
 If the proposal has already been submitted or approved, check the current Chorus status before editing:
