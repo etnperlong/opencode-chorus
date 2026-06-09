@@ -3,7 +3,15 @@ import type { ChorusReadinessRecord, OpenCodeState, SharedState } from "./state-
 
 export type RuntimeOpenCodeState = Pick<
   OpenCodeState,
-  "mainSession" | "planningScopes" | "workers" | "sessionContext" | "chorusReadiness" | "lazyBridge" | "notificationRuntime" | "checkpoints"
+  | "mainSession"
+  | "planningScopes"
+  | "workers"
+  | "sessionContext"
+  | "chorusReadiness"
+  | "lazyBridge"
+  | "notificationRuntime"
+  | "activeAgent"
+  | "checkpoints"
 >
 
 export type PersistedOpenCodeState = Pick<
@@ -77,6 +85,7 @@ export function extractRuntimeOpenCodeState(state: OpenCodeState): RuntimeOpenCo
     notificationRuntime: isNotificationRuntimeRecord(state.notificationRuntime)
       ? sanitizeNotificationRuntime(state.notificationRuntime)
       : undefined,
+    activeAgent: typeof state.activeAgent === "string" ? state.activeAgent : undefined,
     checkpoints: isRecord(state.checkpoints) ? state.checkpoints : {},
   }
 }

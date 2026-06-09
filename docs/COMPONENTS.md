@@ -14,7 +14,7 @@ Exposes `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`, then disco
 
 ### Managed Context Injection
 
-Injects a bounded `Chorus Context` summary into the native agent's system prompt at session start or resume. Includes project scope (managed / unmanaged / ambiguous), owner metadata, permission scope, OpenSpec availability, and staging directory path.
+Injects a bounded `Chorus Context` summary into the native agent's system prompt. Includes project scope (managed / unmanaged / ambiguous), owner metadata, permission scope, and OpenSpec availability. Adds a concise per-turn reminder for main sessions, task workflow guidance for detected sub-sessions, AI-DLC guidance for the `plan` agent, and staging directory guidance only once per hook lifecycle.
 
 ### Notification Coordination
 

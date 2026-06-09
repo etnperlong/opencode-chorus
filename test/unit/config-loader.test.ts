@@ -149,6 +149,9 @@ describe("config loader", () => {
       expect(config.enableSessionContextSummary).toBe(true)
       expect(config.enableNotificationHints).toBe(true)
       expect(config.reviewGateOutputMode).toBe("summary")
+      expect(config.enableSubsessionInjection).toBe(true)
+      expect(config.enablePlanAgentGuidance).toBe(true)
+      expect(config.enablePerTurnReminder).toBe(true)
     } finally {
       await rm(configDir, { recursive: true, force: true })
     }
@@ -376,12 +379,18 @@ describe("config loader", () => {
           CHORUS_API_KEY: "test-key",
           CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY: "false",
           CHORUS_ENABLE_NOTIFICATION_HINTS: "0",
+          CHORUS_ENABLE_SUBSESSION_INJECTION: "false",
+          CHORUS_ENABLE_PLAN_AGENT_GUIDANCE: "0",
+          CHORUS_ENABLE_PER_TURN_REMINDER: "false",
           CHORUS_REVIEW_GATE_OUTPUT_MODE: "detailed",
         },
       )
 
       expect(config.enableSessionContextSummary).toBe(false)
       expect(config.enableNotificationHints).toBe(false)
+      expect(config.enableSubsessionInjection).toBe(false)
+      expect(config.enablePlanAgentGuidance).toBe(false)
+      expect(config.enablePerTurnReminder).toBe(false)
       expect(config.reviewGateOutputMode).toBe("detailed")
     } finally {
       await rm(configDir, { recursive: true, force: true })

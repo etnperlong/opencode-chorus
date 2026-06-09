@@ -158,7 +158,7 @@ Usage flow: call `chorus_tools` → inspect a tool with `chorus_tool_get` → ex
 
 ## Managed Project Context
 
-At session start or resume, the plugin injects a bounded `Chorus Context` summary into the native agent's system prompt using cached runtime state.
+On each system transform, the plugin injects a bounded `Chorus Context` summary into the native agent's system prompt using cached runtime state.
 
 | Scope | Behavior |
 |---|---|
@@ -166,7 +166,15 @@ At session start or resume, the plugin injects a bounded `Chorus Context` summar
 | `unmanaged` | No single Chorus project can be proven; warns the agent not to assume a `projectUuid` |
 | `ambiguous` | Multiple Chorus projects may apply; reports candidate count without guessing |
 
-When available, the injected context also includes owner metadata, permission scope, OpenSpec availability, and the Chorus staging directory path.
+When available, the injected context also includes owner metadata, permission scope, and OpenSpec availability. The Chorus staging directory guidance is injected only once per hook lifecycle.
+
+Additional prompt guidance is controlled by these options, all enabled by default:
+
+| Option | Behavior |
+|---|---|
+| `enablePerTurnReminder` | Adds a concise main-session Chorus reminder on each system transform |
+| `enableSubsessionInjection` | Adds Chorus task workflow guidance for sub-sessions detected from the runtime main session ID |
+| `enablePlanAgentGuidance` | Adds AI-DLC planning guidance when the active OpenCode agent is `plan` |
 
 ## Document Body Uploads
 

@@ -1,17 +1,19 @@
-// Injects concise system guidance for Chorus file-writing workflows.
-// This steers agents toward native file tools and the managed staging directory.
+// Injects concise Chorus runtime context and workflow reminders.
 
 import { formatPermissions } from "../lifecycle/chorus-readiness"
 import { isOpenSpecCliAvailable } from "../openspec/cli"
 import { detectOpenSpecAvailability } from "../openspec/detect"
 import type { SessionContextRecord } from "../state/state-types"
-import {
-  formatStagingDirSystemGuidance,
-  PREFER_NATIVE_FILE_TOOLS_GUIDANCE,
-} from "../util/staging-guidance"
+import { formatStagingDirSystemGuidance } from "../util/staging-guidance"
 
-export const CHORUS_SKILL_FIRST_GUIDANCE =
-  "When using Chorus in this workspace, load the narrowest Chorus skill for workflow details, use `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute` to discover remote tools, use `chorus_workspace_context` only when the user explicitly asks to bind or unbind workspace context, and avoid relying on duplicated long-form workflow manuals in system prompts."
+export const PER_TURN_REMINDER =
+  "[Chorus Plugin Active]\n- Sub-agent sessions are auto-managed by hooks. Do NOT call chorus_create_session or chorus_close_session for sub-agents.\n- When spawning sub-agents, pass Chorus task UUIDs; session lifecycle is auto-injected."
+
+export const SUBSESSION_WORKFLOW_GUIDANCE =
+  "## Chorus Task Workflow\nWhen working on a Chorus task:\n1. Start work: chorus_update_task({ taskUuid, status: \"in_progress\" })\n2. Report progress: chorus_report_work({ taskUuid, report })\n3. Self-check acceptance criteria against implementation\n4. Submit: chorus_submit_for_verify({ taskUuid, summary })\nDo NOT call chorus_create_session or chorus_close_session."
+
+export const PLAN_AGENT_GUIDANCE =
+  "## Chorus AI-DLC Planning Workflow\nWhen planning implementation:\n1. Identify or create a Chorus Idea for this requirement\n2. Create a Proposal with document drafts and task drafts\n3. Set up the task dependency DAG\n4. Submit the Proposal for admin approval\n5. After approval, tasks materialize and can be claimed\nDo NOT start coding without an approved Chorus Proposal."
 
 type SystemTransformInput = {
   sessionID?: string
@@ -22,7 +24,11 @@ type SystemTransformOutput = {
 }
 
 type SystemTransformStateStore = {
-  readOpenCodeState(): Promise<{ sessionContext?: SessionContextRecord }>
+  readOpenCodeState(): Promise<{
+    sessionContext?: SessionContextRecord
+    mainSession?: { runtimeSessionId?: string }
+    activeAgent?: string
+  }>
   readSharedState?(): Promise<{ context?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string } }>
 }
 
@@ -33,6 +39,9 @@ type CreateSystemTransformHookOptions = {
   directory?: string
   ensureSessionContext?: (sessionID: string) => Promise<void>
   isOpenSpecAvailable?: () => Promise<boolean>
+  enableSubsessionInjection?: boolean
+  enablePlanAgentGuidance?: boolean
+  enablePerTurnReminder?: boolean
 }
 
 type ProjectScope =
@@ -54,6 +63,7 @@ type ProjectScope =
 
 export function createSystemTransformHook(options: CreateSystemTransformHookOptions) {
   let openSpecAvailablePromise: Promise<boolean> | undefined
+  let hasInjectedStagingGuidance = false
 
   const readOpenSpecAvailability = async () => {
     if (options.isOpenSpecAvailable) return options.isOpenSpecAvailable()
@@ -67,13 +77,30 @@ export function createSystemTransformHook(options: CreateSystemTransformHookOpti
   return async (input: SystemTransformInput, output: SystemTransformOutput): Promise<void> => {
     await ensureSessionContextSafe(input.sessionID, options.ensureSessionContext)
 
-    pushSystemMessageOnce(output, PREFER_NATIVE_FILE_TOOLS_GUIDANCE)
-    pushSystemMessageOnce(output, CHORUS_SKILL_FIRST_GUIDANCE)
+    const contextState = await buildChorusSystemContext(input, options, readOpenSpecAvailability)
+    const mainSessionId = contextState.state?.mainSession?.runtimeSessionId
+    const activeAgent = contextState.state?.activeAgent
+    const isSubSession = Boolean(input.sessionID && mainSessionId && input.sessionID !== mainSessionId)
 
-    const chorusContext = await buildChorusSystemContext(input, options, readOpenSpecAvailability)
+    const chorusContext = contextState.context
     if (chorusContext) pushSystemMessageOnce(output, chorusContext)
 
-    if (options.stagingDir) pushSystemMessageOnce(output, formatStagingDirSystemGuidance(options.stagingDir))
+    if (!isSubSession && options.enablePerTurnReminder !== false) {
+      pushSystemMessageOnce(output, PER_TURN_REMINDER)
+    }
+
+    if (options.stagingDir && !hasInjectedStagingGuidance) {
+      pushSystemMessageOnce(output, formatStagingDirSystemGuidance(options.stagingDir))
+      hasInjectedStagingGuidance = true
+    }
+
+    if (isSubSession && options.enableSubsessionInjection !== false) {
+      pushSystemMessageOnce(output, SUBSESSION_WORKFLOW_GUIDANCE)
+    }
+
+    if (activeAgent === "plan" && options.enablePlanAgentGuidance !== false) {
+      pushSystemMessageOnce(output, PLAN_AGENT_GUIDANCE)
+    }
   }
 }
 
@@ -98,7 +125,7 @@ async function buildChorusSystemContext(
   input: SystemTransformInput,
   options: CreateSystemTransformHookOptions,
   readOpenSpecAvailability: () => Promise<boolean>,
-): Promise<string> {
+): Promise<{ context: string; state?: Awaited<ReturnType<typeof readOpenCodeStateSafe>> }> {
   const [state, sharedState, openSpecAvailable] = await Promise.all([
     readOpenCodeStateSafe(options.stateStore),
     readSharedStateSafe(options.stateStore),
@@ -145,7 +172,7 @@ async function buildChorusSystemContext(
 
   lines.push(`- OpenSpec: ${openSpecAvailable ? "available" : "unavailable"}`)
 
-  return lines.join("\n")
+  return { context: lines.join("\n"), state }
 }
 
 function resolveProjectScope(options: {
@@ -197,7 +224,9 @@ function resolveProjectScope(options: {
   return { kind: "unmanaged" }
 }
 
-async function readOpenCodeStateSafe(stateStore: SystemTransformStateStore | undefined): Promise<{ sessionContext?: SessionContextRecord } | undefined> {
+async function readOpenCodeStateSafe(
+  stateStore: SystemTransformStateStore | undefined,
+): Promise<Awaited<ReturnType<SystemTransformStateStore["readOpenCodeState"]>> | undefined> {
   if (!stateStore) return undefined
   try {
     return await stateStore.readOpenCodeState()

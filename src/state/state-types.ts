@@ -138,6 +138,7 @@ export type OpenCodeState = {
   chorusReadiness?: ChorusReadinessRecord
   lazyBridge?: LazyBridgeStatusRecord
   notificationRuntime?: NotificationRuntimeRecord
+  activeAgent?: string
   notificationQueue: QueuedNotification[]
   checkpoints: {
     lastUnreadBackfillAt?: string

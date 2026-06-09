@@ -63,6 +63,17 @@ export class StateStore {
     return this.paths.mode === "project"
   }
 
+  setActiveAgent(agent: string): void {
+    this.runtimeState = {
+      ...this.runtimeState,
+      activeAgent: agent,
+    }
+  }
+
+  getActiveAgent(): string | undefined {
+    return this.runtimeState.activeAgent
+  }
+
   async readOpenCodeState(): Promise<OpenCodeState> {
     try {
       const persisted = await this.readPersistedOpenCodeState(this.paths.stateFile)

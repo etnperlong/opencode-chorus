@@ -214,6 +214,33 @@ describe("plugin hooks", () => {
     }
   })
 
+  it("bridges chat.params agent into runtime state", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+    const originalSetActiveAgent = StateStore.prototype.setActiveAgent
+    const activeAgents: string[] = []
+    StateStore.prototype.setActiveAgent = function setActiveAgent(agent: string) {
+      activeAgents.push(agent)
+      return originalSetActiveAgent.call(this, agent)
+    }
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await plugin["chat.params"]?.(
+        { sessionID: "session-context", agent: "plan", model: {} as never, provider: {} as never, message: {} as never },
+        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
+      )
+
+      expect(activeAgents).toContain("plan")
+    } finally {
+      StateStore.prototype.setActiveAgent = originalSetActiveAgent
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
   it("reviews submitted proposals using proposalUuid from args when output omits it", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
@@ -1088,7 +1115,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("injects system guidance to prefer native file tools and use the staging directory", async () => {
+  it("injects concise system guidance and one-time staging directory guidance", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -1101,7 +1128,8 @@ describe("plugin hooks", () => {
       await plugin["experimental.chat.system.transform"]?.({} as never, output as never)
 
       expect(output.system).toContain("existing guidance")
-      expect(output.system.some((line) => line.includes("Prefer OpenCode's native `write` and `edit` tools"))).toBe(true)
+      expect(output.system.some((line) => line.includes("[Chorus Plugin Active]"))).toBe(true)
+      expect(output.system.some((line) => line.includes("Prefer OpenCode's native `write` and `edit` tools"))).toBe(false)
       expect(output.system.some((line) => line.includes("Chorus staging directory"))).toBe(true)
     } finally {
       await rm(rootDir, { recursive: true, force: true })

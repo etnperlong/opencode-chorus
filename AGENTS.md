@@ -22,8 +22,16 @@
 - Config precedence is `chorus.json` in the OpenCode config dir, then environment variables, then explicit plugin options.
 - OpenCode config dir resolution is `OPENCODE_CONFIG_DIR`, then `XDG_CONFIG_HOME/opencode`, then `~/.config/opencode`.
 - Required runtime config is `chorusUrl` plus `apiKey`; env supports `CHORUS_BASE_URL` or `CHORUS_URL`, and `CHORUS_API_KEY` is preferred over storing secrets in `chorus.json`.
+- Chorus prompt injection toggles default to enabled: `enableSubsessionInjection`, `enablePlanAgentGuidance`, and `enablePerTurnReminder`.
 - Default state mode is global. In global mode, `stateDir` is ignored except for legacy `.chorus` migration; set `stateMode: "project"` to force project-local state.
 - Persisted state intentionally keeps only reviews, notification queue, and project metadata. Session context, lazy bridge status, notification runtime, workers, and checkpoints are runtime-only.
+
+## Chorus Workflow
+
+- When using Chorus in this workspace, load the narrowest Chorus skill for the current stage instead of relying on long system prompt manuals.
+- Discover remote tools with `chorus_tools`, inspect with `chorus_tool_get`, then execute raw Chorus MCP tool names through `chorus_tool_execute`, for example `chorus_get_task`.
+- Use `chorus_workspace_context` only when the user explicitly asks to bind or unbind workspace context.
+- For OpenSpec-backed proposals, keep local `openspec/changes/<slug>/` artifacts as the source of truth before mirroring changes to Chorus.
 
 ## Tests And Contracts
 

@@ -1,7 +1,10 @@
 import {
   DEFAULT_AUTO_START,
   DEFAULT_ENABLE_NOTIFICATION_HINTS,
+  DEFAULT_ENABLE_PER_TURN_REMINDER,
+  DEFAULT_ENABLE_PLAN_AGENT_GUIDANCE,
   DEFAULT_ENABLE_PROPOSAL_REVIEWER,
+  DEFAULT_ENABLE_SUBSESSION_INJECTION,
   DEFAULT_ENABLE_SESSION_CONTEXT_SUMMARY,
   DEFAULT_ENABLE_TASK_REVIEWER,
   DEFAULT_MAX_PROPOSAL_REVIEW_ROUNDS,
@@ -31,6 +34,9 @@ export type OpenCodeChorusConfig = {
   reviewerPollIntervalMs: number
   enableSessionContextSummary: boolean
   enableNotificationHints: boolean
+  enableSubsessionInjection: boolean
+  enablePlanAgentGuidance: boolean
+  enablePerTurnReminder: boolean
   reviewGateOutputMode: ReviewGateOutputMode
   stateMode: StateMode
   globalStateRoot?: string
@@ -94,6 +100,18 @@ export function resolveConfig(input: Record<string, unknown>): OpenCodeChorusCon
       input.enableNotificationHints === undefined
         ? DEFAULT_ENABLE_NOTIFICATION_HINTS
         : Boolean(input.enableNotificationHints),
+    enableSubsessionInjection:
+      input.enableSubsessionInjection === undefined
+        ? DEFAULT_ENABLE_SUBSESSION_INJECTION
+        : Boolean(input.enableSubsessionInjection),
+    enablePlanAgentGuidance:
+      input.enablePlanAgentGuidance === undefined
+        ? DEFAULT_ENABLE_PLAN_AGENT_GUIDANCE
+        : Boolean(input.enablePlanAgentGuidance),
+    enablePerTurnReminder:
+      input.enablePerTurnReminder === undefined
+        ? DEFAULT_ENABLE_PER_TURN_REMINDER
+        : Boolean(input.enablePerTurnReminder),
     reviewGateOutputMode:
       input.reviewGateOutputMode === "detailed" ? "detailed" : DEFAULT_REVIEW_GATE_OUTPUT_MODE,
     stateMode: input.stateMode === "project" ? "project" : DEFAULT_STATE_MODE,

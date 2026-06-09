@@ -2,12 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v0.6.0 - 2026-06-09
+
+### Added
+
+- Added runtime `activeAgent` tracking from `chat.params` so system prompt injection can adapt to the current OpenCode agent.
+- Added configurable prompt injection toggles: `enableSubsessionInjection`, `enablePlanAgentGuidance`, and `enablePerTurnReminder`, all enabled by default.
+- Added concise per-turn Chorus reminders, sub-session task workflow guidance, and Plan agent AI-DLC guidance.
 
 ### Changed
 
+- Refactored system prompt injection to remove repeated native file tools and skill-first guidance while retaining dynamic `Chorus Context` refreshes.
+- Limited Chorus staging directory guidance to the first injection per hook lifecycle to reduce repeated token overhead.
+- Moved key Chorus skill usage guidance into `AGENTS.md` so agents still load the narrowest Chorus skill and use the lazy bridge discovery flow without repeated system prompt injection.
+- Updated system prompt injection docs in `docs/CONFIGURATION.md` and `docs/COMPONENTS.md`.
 - Updated bundled Chorus skills to upstream skill metadata version `0.9.4`, including the v0.9.4 elaboration contract, structured acceptance criteria examples, and explicit `chorus_get_proposal` section usage.
-- Bumped package version to `0.5.1`.
+- Bumped package version to `0.6.0`.
+
+### Fixed
+
+- Fixed the OpenSpec change artifact for prompt injection alignment by converting it into a valid `plugin-runtime` capability delta.
 
 ## v0.5.0 - 2026-05-26
 

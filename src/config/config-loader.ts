@@ -102,6 +102,9 @@ function parseEnvConfig(env: ChorusConfigEnv): PartialConfig {
     reviewerPollIntervalMs: parsePositiveInteger(env.CHORUS_REVIEWER_POLL_INTERVAL_MS),
     enableSessionContextSummary: parseBoolean(env.CHORUS_ENABLE_SESSION_CONTEXT_SUMMARY),
     enableNotificationHints: parseBoolean(env.CHORUS_ENABLE_NOTIFICATION_HINTS),
+    enableSubsessionInjection: parseBoolean(env.CHORUS_ENABLE_SUBSESSION_INJECTION),
+    enablePlanAgentGuidance: parseBoolean(env.CHORUS_ENABLE_PLAN_AGENT_GUIDANCE),
+    enablePerTurnReminder: parseBoolean(env.CHORUS_ENABLE_PER_TURN_REMINDER),
     reviewGateOutputMode: parseReviewGateOutputMode(env.CHORUS_REVIEW_GATE_OUTPUT_MODE),
   })
 }

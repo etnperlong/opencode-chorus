@@ -128,6 +128,18 @@ describe("StateStore", () => {
     expect(result.mainSession.status).toBe("active")
   })
 
+  it("tracks the active agent in runtime state only", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "chorus-state-"))
+    const globalRoot = await mkdtemp(join(tmpdir(), "chorus-global-"))
+    const store = new StateStore({ projectRoot, stateMode: "global", globalStateRoot: globalRoot })
+
+    store.setActiveAgent("plan")
+
+    expect(store.getActiveAgent()).toBe("plan")
+    expect((await store.readOpenCodeState()).activeAgent).toBe("plan")
+    expect(await exists(store.paths.stateFile)).toBe(false)
+  })
+
   it("does not create state directories for global runtime-only updates", async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), "chorus-project-"))
     const globalRoot = await mkdtemp(join(tmpdir(), "chorus-global-"))

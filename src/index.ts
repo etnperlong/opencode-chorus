@@ -133,6 +133,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
     directory: ctx.directory,
     stagingDir: stateStore.paths.stagingDir,
     ensureSessionContext: (sessionID) => sessionLifecycle.start(sessionID),
+    enableSubsessionInjection: config.enableSubsessionInjection,
+    enablePlanAgentGuidance: config.enablePlanAgentGuidance,
+    enablePerTurnReminder: config.enablePerTurnReminder,
   })
   if (loadedConfig.metadata.apiKeySource === "chorus.json") {
     await logger.warn("Chorus API key was loaded from chorus.json; prefer CHORUS_API_KEY for secrets.")
@@ -169,6 +172,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     "tool.execute.after": toolExecuteAfterHook,
     "experimental.chat.system.transform": systemTransformHook,
     "chat.params": async ({ sessionID, agent }) => {
+      stateStore.setActiveAgent(agent)
       await hydrateSessionContext(sessionID, agent).catch(async (error) => {
         await logger.warn("Chorus session context hydration failed on chat.params", {
           error: error instanceof Error ? error.message : String(error),
