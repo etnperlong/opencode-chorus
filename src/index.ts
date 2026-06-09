@@ -172,6 +172,9 @@ export const createPlugin: Plugin = async (ctx, options) => {
     "permission.ask": permissionAskHook,
     "tool.execute.after": toolExecuteAfterHook,
     "experimental.chat.system.transform": systemTransformHook,
+    "chat.message": async ({ agent }) => {
+      if (agent) stateStore.setActiveAgent(agent)
+    },
     "chat.params": async ({ sessionID, agent }) => {
       stateStore.setActiveAgent(agent)
       await hydrateSessionContext(sessionID, agent).catch(async (error) => {

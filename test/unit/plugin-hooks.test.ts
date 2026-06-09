@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { restorePluginHookMocks, setPluginHookMockRuntime } from "./plugin-hooks-mocks"
 import { createPlugin } from "../../src/index"
+import { PLAN_AGENT_GUIDANCE } from "../../src/hooks/system-transform-hook"
 import { resolveStatePaths } from "../../src/state/paths"
 import { StateStore } from "../../src/state/state-store"
 const toolCalls: Array<{ name: string; args: Record<string, unknown> }> = []
@@ -237,6 +238,28 @@ describe("plugin hooks", () => {
       expect(activeAgents).toContain("plan")
     } finally {
       StateStore.prototype.setActiveAgent = originalSetActiveAgent
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
+  it("bridges chat.message agent before system prompt transform", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+      const output = { system: [] as string[] }
+
+      await plugin["chat.message"]?.(
+        { sessionID: "session-plan", agent: "plan", model: {} as never },
+        { message: {} as never, parts: [] },
+      )
+      await plugin["experimental.chat.system.transform"]?.({ sessionID: "session-plan", model: {} as never }, output as never)
+
+      expect(output.system).toContain(PLAN_AGENT_GUIDANCE)
+    } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
   })
