@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Fixed session-start TUI Toast not showing after the dedicated Chorus agent removal by adding `showConnectionToast()` to session hydration.
 - Fixed the OpenSpec change artifact for prompt injection alignment by converting it into a valid `plugin-runtime` capability delta.
 
 ## v0.5.0 - 2026-05-26

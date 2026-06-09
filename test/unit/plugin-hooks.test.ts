@@ -1174,7 +1174,7 @@ describe("plugin hooks", () => {
 
       expect(toolCalls.filter((call) => call.name === "chorus_checkin")).toHaveLength(1)
       expect(listToolsCalls).toBe(0)
-      expect(toastCalls.some((t) => t.title === "Chorus connected")).toBe(false)
+      expect(toastCalls.some((t) => t.title === "Chorus connected")).toBe(true)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -1199,7 +1199,7 @@ describe("plugin hooks", () => {
 
       expect(toolCalls.filter((call) => call.name === "chorus_checkin")).toHaveLength(1)
       expect(listToolsCalls).toBe(0)
-      expect(toastCalls.filter((t) => t.title === "Chorus connected")).toHaveLength(0)
+      expect(toastCalls.filter((t) => t.title === "Chorus connected")).toHaveLength(1)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }

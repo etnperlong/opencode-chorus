@@ -42,6 +42,7 @@ export type ChorusReadinessOptions = {
 export class ChorusReadiness {
   private doneSessionIds = new Set<string>()
   private inFlightReadiness = new Map<string, Promise<void>>()
+  private hasShownConnectionToast = false
 
   constructor(private readonly options: ChorusReadinessOptions) {}
 
@@ -68,6 +69,30 @@ export class ChorusReadiness {
   markSessionEnded(sessionId: string): void {
     this.doneSessionIds.delete(sessionId)
     this.inFlightReadiness.delete(sessionId)
+  }
+
+  async showConnectionToast(): Promise<void> {
+    if (this.hasShownConnectionToast) return
+
+    const state = await this.options.stateStore.readOpenCodeState()
+    const context = state.sessionContext
+
+    const [projectGroupName, openSpecAvailable] = await Promise.all([
+      this.resolveProjectGroupName(context),
+      this.detectOpenSpec(),
+    ])
+
+    const agentName = context?.agent?.name ?? "Chorus"
+    const scopeStr = buildProjectScopeStr(context?.projects ?? [], projectGroupName)
+    const lines: string[] = [`▣ Agent: ${agentName}`]
+    if (scopeStr) lines.push(`▣ Project: ${scopeStr}`)
+    if (openSpecAvailable) lines.push("", "(+ OpenSpec)")
+    await this.showToast({
+      title: "Chorus connected",
+      message: lines.join("\n"),
+      variant: "success",
+    })
+    this.hasShownConnectionToast = true
   }
 
   private async runReadiness(sessionId: string, mode: "visible" | "silent"): Promise<void> {

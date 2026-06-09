@@ -159,6 +159,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     if (REVIEWER_AGENTS.has(agent)) return
 
     await sessionLifecycle.start(sessionID)
+    await readiness.showConnectionToast()
     if (config.enableSessionContextSummary) {
       await sessionLifecycle.surfaceContextSummary(sessionID, logger, stateStore.paths.stagingDir)
     }
