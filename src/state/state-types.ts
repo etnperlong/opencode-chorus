@@ -139,6 +139,7 @@ export type OpenCodeState = {
   lazyBridge?: LazyBridgeStatusRecord
   notificationRuntime?: NotificationRuntimeRecord
   activeAgent?: string
+  activated: boolean
   notificationQueue: QueuedNotification[]
   checkpoints: {
     lastUnreadBackfillAt?: string

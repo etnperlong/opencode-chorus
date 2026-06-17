@@ -1,5 +1,4 @@
 import {
-  DEFAULT_AUTO_START,
   DEFAULT_ENABLE_NOTIFICATION_HINTS,
   DEFAULT_ENABLE_PER_TURN_REMINDER,
   DEFAULT_ENABLE_PLAN_AGENT_GUIDANCE,
@@ -25,7 +24,6 @@ export type OpenCodeChorusConfig = {
   chorusUrl: string
   apiKey: string
   projectUuids: string[]
-  autoStart: boolean
   enableProposalReviewer: boolean
   enableTaskReviewer: boolean
   maxProposalReviewRounds: number
@@ -67,7 +65,6 @@ export function resolveConfig(input: Record<string, unknown>): OpenCodeChorusCon
     projectUuids: Array.isArray(input.projectUuids)
       ? input.projectUuids.map((item) => String(item))
       : [],
-    autoStart: input.autoStart === undefined ? DEFAULT_AUTO_START : Boolean(input.autoStart),
     enableProposalReviewer:
       input.enableProposalReviewer === undefined
         ? DEFAULT_ENABLE_PROPOSAL_REVIEWER

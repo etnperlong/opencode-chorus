@@ -7,6 +7,7 @@ type ChorusReadinessStateStore = {
   readOpenCodeState(): Promise<{ sessionContext?: SessionContextRecord }>
   readSharedState?(): Promise<{ context?: { projectUuid?: string; projectGroupUuid?: string } }>
   updateOpenCodeState(updater: (state: Record<string, unknown>) => Record<string, unknown>): Promise<unknown>
+  setActivated?(activated: boolean): void
 }
 
 type ChorusReadinessClient = {
@@ -150,6 +151,7 @@ export class ChorusReadiness {
       }
 
       await this.options.onReady?.(sessionId)
+      this.options.stateStore.setActivated?.(true)
     } catch (error) {
       if (mode === "visible") {
         await this.showToast({

@@ -74,6 +74,17 @@ export class StateStore {
     return this.runtimeState.activeAgent
   }
 
+  isActivated(): boolean {
+    return this.runtimeState.activated
+  }
+
+  setActivated(activated: boolean): void {
+    this.runtimeState = {
+      ...this.runtimeState,
+      activated,
+    }
+  }
+
   async readOpenCodeState(): Promise<OpenCodeState> {
     try {
       const persisted = await this.readPersistedOpenCodeState(this.paths.stateFile)

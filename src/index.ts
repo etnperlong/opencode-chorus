@@ -89,7 +89,6 @@ export const createPlugin: Plugin = async (ctx, options) => {
     chorusUrl: config.chorusUrl,
     apiKey: config.apiKey,
     projectUuids: config.projectUuids,
-    autoStart: config.autoStart,
     enableNotificationHints: config.enableNotificationHints,
     directory: ctx.directory,
     stateStore,
@@ -98,7 +97,6 @@ export const createPlugin: Plugin = async (ctx, options) => {
     logger,
   })
   const eventHook = createPluginEventHook({
-    autoStart: config.autoStart,
     stateStore,
     sessionLifecycle,
     logger,
@@ -153,17 +151,12 @@ export const createPlugin: Plugin = async (ctx, options) => {
     stateMode: stateStore.paths.mode,
     stateFile: stateStore.paths.stateFile,
   })
-  await notificationCoordinator.start()
 
   const hydrateSessionContext = async (sessionID: string, agent: string) => {
     if (REVIEWER_AGENTS.has(agent)) return
-
-    await sessionLifecycle.start(sessionID)
-    await readiness.showConnectionToast()
     if (config.enableSessionContextSummary) {
       await sessionLifecycle.surfaceContextSummary(sessionID, logger, stateStore.paths.stagingDir)
     }
-    await notificationCoordinator.start()
   }
 
   return {

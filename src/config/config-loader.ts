@@ -93,7 +93,6 @@ function parseEnvConfig(env: ChorusConfigEnv): PartialConfig {
     globalStateRoot: nonEmpty(env.CHORUS_GLOBAL_STATE_ROOT),
     stateDir: nonEmpty(env.CHORUS_STATE_DIR),
     sharedStateMode: nonEmpty(env.CHORUS_SHARED_STATE_MODE),
-    autoStart: parseBoolean(env.CHORUS_AUTO_START),
     enableProposalReviewer: parseBoolean(env.CHORUS_ENABLE_PROPOSAL_REVIEWER),
     enableTaskReviewer: parseBoolean(env.CHORUS_ENABLE_TASK_REVIEWER),
     maxProposalReviewRounds: parsePositiveInteger(env.CHORUS_MAX_PROPOSAL_REVIEW_ROUNDS),

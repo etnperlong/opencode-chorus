@@ -31,7 +31,6 @@ type NotificationCoordinatorOptions = {
   chorusUrl: string
   apiKey: string
   projectUuids?: string[]
-  autoStart: boolean
   enableNotificationHints: boolean
   directory: string
   stateStore: StateStore
@@ -103,7 +102,7 @@ export class NotificationCoordinator {
 
     const routed = routeNotification(
       { ...notification, notificationUuid: notification.uuid ?? notification.notificationUuid ?? event.notificationUuid },
-      { enableNotificationHints: this.options.enableNotificationHints, autoStart: this.options.autoStart },
+      { enableNotificationHints: this.options.enableNotificationHints },
     )
     if (routed.kind === "ignored") return
 
@@ -136,7 +135,7 @@ export class NotificationCoordinator {
           ...notification,
           notificationUuid: notification.uuid ?? notification.notificationUuid,
         },
-        { enableNotificationHints: this.options.enableNotificationHints, autoStart: this.options.autoStart },
+        { enableNotificationHints: this.options.enableNotificationHints },
       )
       if (routed.kind === "ignored") continue
       const scopeEvaluation = await this.evaluateScope(notification)

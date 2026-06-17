@@ -13,7 +13,6 @@ type PluginEventPayload = {
 }
 
 type CreatePluginEventHookOptions = {
-  autoStart: boolean
   stateStore: StateStore
   sessionLifecycle: SessionLifecycle
   logger: Pick<Logger, "debug" | "info" | "warn">
@@ -32,7 +31,7 @@ export function createPluginEventHook(options: CreatePluginEventHookOptions) {
       const sessionId = extractSessionEventId(event)
       if (sessionId) {
         const state = await options.stateStore.readOpenCodeState()
-        if (shouldReplaceMainSessionOnStartup(state.mainSession, sessionId, hasHandledSessionStartup) || options.autoStart) {
+        if (shouldReplaceMainSessionOnStartup(state.mainSession, sessionId, hasHandledSessionStartup)) {
           await cleanupOrphanWorkers(options.stateStore)
           await markInterruptedReviews(options.stateStore)
         }

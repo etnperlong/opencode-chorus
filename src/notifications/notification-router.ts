@@ -37,7 +37,6 @@ export type RoutedNotification =
 
 type RouteNotificationOptions = {
   enableNotificationHints?: boolean
-  autoStart?: boolean
 }
 
 export function routeNotification(input: NotificationInput, options: RouteNotificationOptions = {}): RoutedNotification {
@@ -56,7 +55,7 @@ export function routeNotification(input: NotificationInput, options: RouteNotifi
     return {
       notificationUuid: input.notificationUuid,
       kind: "task_assigned",
-      delivery: options.autoStart === false ? "context_only" : "assistant_turn",
+      delivery: "assistant_turn",
       entityUuid: input.entityUuid,
       projectUuid: input.projectUuid,
       title: "Task assigned",

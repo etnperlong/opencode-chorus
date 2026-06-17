@@ -27,8 +27,9 @@ const CHORUS_SILENT_AGENTS = new Set(["proposal-reviewer", "task-reviewer"])
 type CreateChorusLazyBridgeToolsOptions = {
   chorusClient: ChorusLazyBridgeClient
   stateStore?: {
-    readOpenCodeState?(): Promise<{ sessionContext?: SessionContextRecord }>
+    readOpenCodeState?(): Promise<{ sessionContext?: SessionContextRecord; mainSession?: { runtimeSessionId?: string; status?: string } }>
     updateOpenCodeState(updater: (state: Record<string, unknown>) => Record<string, unknown>): Promise<unknown>
+    isActivated?(): boolean
     readSharedState?(): Promise<{ context?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string } }>
     updateSharedState?(updater: (state: SharedState) => SharedState): Promise<SharedState>
   }
@@ -38,7 +39,7 @@ type CreateChorusLazyBridgeToolsOptions = {
   chorusUrl?: string
   /** Chorus-managed staging directory; paths inside it are accepted alongside workspace paths. */
   stagingDir?: string
-  /** Readiness coordinator for on-demand silent initialization by reviewer agents. */
+  /** Readiness coordinator for on-demand initialization. */
   readiness?: {
     ensureReady(sessionId: string, mode: "visible" | "silent"): Promise<void>
   }
@@ -186,7 +187,7 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
       description: "List all available Chorus tools before inspecting or executing one.",
       args: {},
       async execute(_args, ctx) {
-        await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
+        await triggerReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         return formatToolResult(listTools(index))
       },
@@ -198,7 +199,7 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
         toolName: tool.schema.string().describe("Exact Chorus tool name from chorus_tools, for example: `chorus_get_task`"),
       },
       async execute(args, ctx) {
-        await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
+        await triggerReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         const target = index.find((item) => item.name === args.toolName)
         if (!target) throw createToolNotFoundError(args.toolName)
@@ -216,7 +217,7 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
           .describe("Arguments for the Chorus tool"),
       },
       async execute(args, ctx) {
-        await triggerSilentReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
+        await triggerReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
         const index = await readToolIndex()
         const toolName = args.toolName
         const target = index.find((item) => item.name === toolName)
@@ -237,19 +238,34 @@ export function createChorusLazyBridge(options: CreateChorusLazyBridgeToolsOptio
       chorusClient: options.chorusClient,
       stateStore: hasWorkspaceContextStateStore(options.stateStore) ? options.stateStore : undefined,
       tui: options.tui,
+      beforeExecute: async (_args, ctx) => {
+        await triggerReadinessIfNeeded(ctx.agent, ctx.sessionID, options)
+      },
     }),
   }
 
   return { tools, refresh }
 }
 
-async function triggerSilentReadinessIfNeeded(
+async function triggerReadinessIfNeeded(
   agent: string,
   sessionId: string,
   options: CreateChorusLazyBridgeToolsOptions,
 ): Promise<void> {
-  if (CHORUS_SILENT_AGENTS.has(agent) && options.readiness) {
-    await options.readiness.ensureReady(sessionId, "silent")
+  if (options.stateStore?.isActivated?.() && (await isCurrentSessionReady(sessionId, options))) return
+  if (!options.readiness) return
+  await options.readiness.ensureReady(sessionId, CHORUS_SILENT_AGENTS.has(agent) ? "silent" : "visible")
+}
+
+async function isCurrentSessionReady(
+  sessionId: string,
+  options: CreateChorusLazyBridgeToolsOptions,
+): Promise<boolean> {
+  try {
+    const state = await options.stateStore?.readOpenCodeState?.()
+    return state?.mainSession?.status === "active" && state.mainSession.runtimeSessionId === sessionId
+  } catch {
+    return false
   }
 }
 

@@ -28,6 +28,7 @@ type SystemTransformStateStore = {
     sessionContext?: SessionContextRecord
     mainSession?: { runtimeSessionId?: string }
     activeAgent?: string
+    activated?: boolean
   }>
   readSharedState?(): Promise<{ context?: { projectUuid?: string; projectName?: string; projectGroupUuid?: string } }>
 }
@@ -75,6 +76,9 @@ export function createSystemTransformHook(options: CreateSystemTransformHookOpti
   }
 
   return async (input: SystemTransformInput, output: SystemTransformOutput): Promise<void> => {
+    const activationState = await readOpenCodeStateSafe(options.stateStore)
+    if (activationState?.activated === false) return
+
     await ensureSessionContextSafe(input.sessionID, options.ensureSessionContext)
 
     const contextState = await buildChorusSystemContext(input, options, readOpenSpecAvailability)

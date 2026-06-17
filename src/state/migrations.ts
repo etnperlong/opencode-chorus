@@ -11,6 +11,7 @@ export type RuntimeOpenCodeState = Pick<
   | "lazyBridge"
   | "notificationRuntime"
   | "activeAgent"
+  | "activated"
   | "checkpoints"
 >
 
@@ -24,6 +25,7 @@ export function createDefaultRuntimeState(): RuntimeOpenCodeState {
     mainSession: { status: "idle" },
     planningScopes: {},
     workers: {},
+    activated: false,
     checkpoints: {},
   }
 }
@@ -86,6 +88,7 @@ export function extractRuntimeOpenCodeState(state: OpenCodeState): RuntimeOpenCo
       ? sanitizeNotificationRuntime(state.notificationRuntime)
       : undefined,
     activeAgent: typeof state.activeAgent === "string" ? state.activeAgent : undefined,
+    activated: state.activated === true,
     checkpoints: isRecord(state.checkpoints) ? state.checkpoints : {},
   }
 }

@@ -19,6 +19,7 @@ type CreateWorkspaceContextToolOptions = {
   chorusClient: WorkspaceContextClient
   stateStore?: WorkspaceContextStateStore
   tui?: WorkspaceContextTui
+  beforeExecute?: (args: { action: "bind_project" | "unbind_project" | "show"; projectUuid?: string }, ctx: { agent: string; sessionID: string }) => Promise<void>
 }
 
 export function createWorkspaceContextTool(options: CreateWorkspaceContextToolOptions): ToolDefinition {
@@ -31,7 +32,8 @@ export function createWorkspaceContextTool(options: CreateWorkspaceContextToolOp
         .describe("Use bind_project to persist a Chorus project UUID, unbind_project to clear it, or show to inspect current context."),
       projectUuid: tool.schema.string().optional().describe("Chorus project UUID. Required when action is bind_project."),
     },
-    async execute(args) {
+    async execute(args, ctx) {
+      await options.beforeExecute?.(args, ctx)
       if (!options.stateStore) throw new Error("Chorus workspace context store is unavailable.")
       if (args.action === "bind_project") return bindProject(args.projectUuid, options)
       if (args.action === "unbind_project") return unbindProject(options)
