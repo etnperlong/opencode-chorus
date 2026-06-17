@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- Updated bundled Chorus skills to upstream skill metadata version `0.10.0`, including Idea lineage guidance for `parentUuid`, `chorus_edit_idea`, and full-subtree `chorus_move_idea` behavior.
+- Updated reviewer prompts and proposal review snapshots to request explicit `chorus_get_proposal` sections when full draft bodies or proposal documents are required.
+- Updated MCP clientInfo version reporting to use the package version instead of the stale hard-coded `0.1.0` value.
+- Bumped the plugin package version to `0.10.0` to match the upstream Chorus plugin version.
+
 ## v0.6.0 - 2026-06-09
 
 ### Added
