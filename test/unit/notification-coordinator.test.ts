@@ -38,7 +38,6 @@ describe("NotificationCoordinator", () => {
         chorusUrl: "http://chorus.test",
         apiKey: "key",
         projectUuids: ["proj-1"],
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -103,7 +102,6 @@ describe("NotificationCoordinator", () => {
       const coordinator = new NotificationCoordinator({
         chorusUrl: "http://chorus.test",
         apiKey: "key",
-        autoStart: false,
         enableNotificationHints: false,
         directory: rootDir,
         stateStore,
@@ -144,7 +142,6 @@ describe("NotificationCoordinator", () => {
         chorusUrl: "http://chorus.test",
         apiKey: "key",
         projectUuids: ["proj-1"],
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -207,7 +204,6 @@ describe("NotificationCoordinator", () => {
         chorusUrl: "http://chorus.test",
         apiKey: "key",
         projectUuids: ["proj-allowed"],
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -269,7 +265,6 @@ describe("NotificationCoordinator", () => {
         chorusUrl: "http://chorus.test",
         apiKey: "key",
         projectUuids: ["proj-allowed"],
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -336,7 +331,6 @@ describe("NotificationCoordinator", () => {
         chorusUrl: "http://chorus.test",
         apiKey: "key",
         projectUuids: ["proj-allowed"],
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -406,7 +400,6 @@ describe("NotificationCoordinator", () => {
       const coordinator = new NotificationCoordinator({
         chorusUrl: "http://chorus.test",
         apiKey: "key",
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -477,7 +470,6 @@ describe("NotificationCoordinator", () => {
       const coordinator = new NotificationCoordinator({
         chorusUrl: "http://chorus.test",
         apiKey: "key",
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -537,7 +529,6 @@ describe("NotificationCoordinator", () => {
       const coordinator = new NotificationCoordinator({
         chorusUrl: "http://chorus.test",
         apiKey: "key",
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -607,7 +598,6 @@ describe("NotificationCoordinator", () => {
       const coordinator = new NotificationCoordinator({
         chorusUrl: "http://chorus.test",
         apiKey: "key",
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,
@@ -693,7 +683,6 @@ describe("NotificationCoordinator", () => {
       const coordinator = new NotificationCoordinator({
         chorusUrl: "http://chorus.test",
         apiKey: "key",
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,

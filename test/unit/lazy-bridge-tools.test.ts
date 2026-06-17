@@ -74,10 +74,31 @@ describe("Chorus lazy bridge tools", () => {
     expect(readinessCalls).toEqual([{ sessionId: "reviewer-session", mode: "silent" }])
   })
 
-  it("does NOT trigger silent readiness for native agents", async () => {
+  it("triggers visible readiness for native agents before bridge access", async () => {
+    const readinessCalls: Array<{ sessionId: string; mode: string }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+      readiness: {
+        ensureReady: async (sessionId, mode) => {
+          readinessCalls.push({ sessionId, mode })
+        },
+      },
+    })
+
+    await tools.chorus_tools!.execute({}, createToolContext("build", "native-session"))
+
+    expect(readinessCalls).toEqual([{ sessionId: "native-session", mode: "visible" }])
+  })
+
+  it("does not repeat readiness once activated", async () => {
     const readinessCalls: string[] = []
     const tools = createChorusLazyBridgeTools({
       chorusClient: createClient(),
+      stateStore: {
+        isActivated: () => true,
+        readOpenCodeState: async () => ({ mainSession: { status: "active", runtimeSessionId: "native-session" } }),
+        updateOpenCodeState: async (updater: (state: Record<string, unknown>) => Record<string, unknown>) => updater({}),
+      },
       readiness: {
         ensureReady: async (sessionId) => {
           readinessCalls.push(sessionId)
@@ -85,7 +106,7 @@ describe("Chorus lazy bridge tools", () => {
       },
     })
 
-    await tools.chorus_tools!.execute({}, createToolContext("build"))
+    await tools.chorus_tools!.execute({}, createToolContext("build", "native-session"))
 
     expect(readinessCalls).toEqual([])
   })
@@ -322,6 +343,35 @@ describe("Chorus lazy bridge tools", () => {
       message: "Bound to OpenCode-Chorus (project-1)",
       variant: "success",
     })
+  })
+
+  it("triggers visible readiness before workspace context access", async () => {
+    let sharedState: SharedState = { version: 1, context: {}, orphanHints: [] }
+    const readinessCalls: Array<{ sessionId: string; mode: string }> = []
+    const tools = createChorusLazyBridgeTools({
+      chorusClient: createClient(),
+      stateStore: {
+        async updateOpenCodeState(updater: (state: Record<string, unknown>) => Record<string, unknown>) {
+          return updater({})
+        },
+        async readSharedState() {
+          return sharedState
+        },
+        async updateSharedState(updater) {
+          sharedState = updater(sharedState)
+          return sharedState
+        },
+      },
+      readiness: {
+        ensureReady: async (sessionId, mode) => {
+          readinessCalls.push({ sessionId, mode })
+        },
+      },
+    })
+
+    await tools.chorus_workspace_context!.execute({ action: "show" }, createToolContext("build", "workspace-session"))
+
+    expect(readinessCalls).toEqual([{ sessionId: "workspace-session", mode: "visible" }])
   })
 
   it("unbinds workspace project context and shows a toast", async () => {

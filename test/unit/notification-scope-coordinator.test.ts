@@ -15,7 +15,6 @@ describe("NotificationCoordinator scope diagnostics", () => {
         chorusUrl: "http://chorus.test",
         apiKey: "key",
         projectUuids: ["proj-allowed"],
-        autoStart: true,
         enableNotificationHints: true,
         directory: rootDir,
         stateStore,

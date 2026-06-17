@@ -12,7 +12,6 @@ describe("plugin event hook", () => {
     const idleCallbacks: string[] = []
 
     const hook = createPluginEventHook({
-      autoStart: true,
       stateStore: {
         readOpenCodeState: async () => ({ mainSession: { status: "idle", runtimeSessionId: "main" } }),
       } as never,
@@ -41,7 +40,7 @@ describe("plugin event hook", () => {
     const store = await createStore()
     await store.updateOpenCodeState((state) => ({
       ...state,
-      mainSession: { status: "idle" },
+      mainSession: { runtimeSessionId: "runtime-old", status: "active" },
       reviews: {
         "task:task-interrupted": {
           currentRound: 1,
@@ -54,7 +53,6 @@ describe("plugin event hook", () => {
     }))
 
     const hook = createPluginEventHook({
-      autoStart: true,
       stateStore: store,
       sessionLifecycle: {
         heartbeat: async () => {},
@@ -80,7 +78,6 @@ describe("plugin event hook", () => {
     const readyCalls: string[] = []
 
     const hook = createPluginEventHook({
-      autoStart: true,
       stateStore: store,
       sessionLifecycle: {
         // start should NOT be called from the event hook anymore
@@ -113,7 +110,6 @@ describe("plugin event hook", () => {
     }))
 
     const hook = createPluginEventHook({
-      autoStart: true,
       stateStore: store,
       sessionLifecycle: {
         heartbeat: async () => {},

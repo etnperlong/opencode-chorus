@@ -327,7 +327,6 @@ describe("config loader", () => {
           OPENCODE_CONFIG_DIR: configDir,
           CHORUS_BASE_URL: "http://chorus:3000",
           CHORUS_API_KEY: "env-key",
-          CHORUS_AUTO_START: "0",
           CHORUS_ENABLE_PROPOSAL_REVIEWER: "false",
           CHORUS_ENABLE_TASK_REVIEWER: "1",
           CHORUS_MAX_PROPOSAL_REVIEW_ROUNDS: "5",
@@ -335,11 +334,29 @@ describe("config loader", () => {
         },
       )
 
-      expect(result.config.autoStart).toBe(false)
       expect(result.config.enableProposalReviewer).toBe(false)
       expect(result.config.enableTaskReviewer).toBe(true)
       expect(result.config.maxProposalReviewRounds).toBe(5)
       expect(result.config.maxTaskReviewRounds).toBe(6)
+    } finally {
+      await rm(configDir, { recursive: true, force: true })
+    }
+  })
+
+  it("ignores legacy autoStart from chorus.json", async () => {
+    const configDir = await mkdtemp(join(tmpdir(), "opencode-config-"))
+
+    try {
+      await writeFile(
+        join(configDir, "chorus.json"),
+        JSON.stringify({ chorusUrl: "http://chorus:3000", apiKey: "file-key", autoStart: false }),
+      )
+
+      const result = await loadChorusConfig({}, { OPENCODE_CONFIG_DIR: configDir })
+
+      expect("autoStart" in result.config).toBe(false)
+      expect(result.config.chorusUrl).toBe("http://chorus:3000")
+      expect(result.config.apiKey).toBe("file-key")
     } finally {
       await rm(configDir, { recursive: true, force: true })
     }

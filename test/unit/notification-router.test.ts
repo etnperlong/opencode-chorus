@@ -34,7 +34,7 @@ describe("routeNotification", () => {
     )
   })
 
-  it("routes task assignments quietly when hints are disabled", () => {
+  it("routes task assignments to an assistant turn when hints are disabled", () => {
     expect(
       routeNotification(
         {
@@ -44,12 +44,12 @@ describe("routeNotification", () => {
           projectUuid: "proj-1",
           entityTitle: "Task A",
         },
-        { enableNotificationHints: false, autoStart: false },
+        { enableNotificationHints: false },
       ),
     ).toMatchObject({
       kind: "task_assigned",
       entityUuid: "task-1",
-      delivery: "context_only",
+      delivery: "assistant_turn",
     })
   })
 

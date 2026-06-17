@@ -119,14 +119,13 @@ describe("plugin hooks", () => {
     await rm(configDir, { recursive: true, force: true })
   })
 
-  it("does not check in or start the main Chorus session when autoStart is false", async () => {
+  it("does not check in or start the main Chorus session before Chorus tool use", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
       const plugin = await createPlugin(createContext(rootDir), {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
-        autoStart: false,
       })
 
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never)
@@ -152,7 +151,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("does not surface Chorus context on session.created — surfaces via chat.params when a native agent is used", async () => {
+  it("does not surface Chorus context on session.created or chat.params before tool activation", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -167,25 +166,18 @@ describe("plugin hooks", () => {
       // No context log message should appear on session.created
       expect(logCalls.some((call) => call.message?.startsWith("Chorus context:"))).toBe(false)
 
-      // Trigger session-context hydration via chat.params
       await plugin["chat.params"]?.(
         { sessionID: "session-context", agent: "build", model: {} as never, provider: {} as never, message: {} as never },
         { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
       )
 
-      // Now context summary should be surfaced
-      expect(logCalls).toContainEqual(
-        expect.objectContaining({
-          level: "info",
-          message: expect.stringContaining("Chorus context: OpenCode connected"),
-        }),
-      )
-      // Should be surfaced exactly once even with multiple chat.params calls
+      expect(logCalls.some((call) => call.message?.startsWith("Chorus context:"))).toBe(false)
+
       await plugin["chat.params"]?.(
         { sessionID: "session-context", agent: "build", model: {} as never, provider: {} as never, message: {} as never },
         { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
       )
-      expect(logCalls.filter((call) => call.message?.startsWith("Chorus context:"))).toHaveLength(1)
+      expect(logCalls.filter((call) => call.message?.startsWith("Chorus context:"))).toHaveLength(0)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -242,7 +234,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("bridges chat.message agent before system prompt transform", async () => {
+  it("skips system prompt transform before tool activation even when chat.message bridges agent", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -258,7 +250,7 @@ describe("plugin hooks", () => {
       )
       await plugin["experimental.chat.system.transform"]?.({ sessionID: "session-plan", model: {} as never }, output as never)
 
-      expect(output.system).toContain(PLAN_AGENT_GUIDANCE)
+      expect(output.system).not.toContain(PLAN_AGENT_GUIDANCE)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -1146,9 +1138,10 @@ describe("plugin hooks", () => {
         chorusUrl: "http://localhost:8637",
         apiKey: "test-key",
       })
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-guidance", rootDir))
       const output = { system: ["existing guidance"] }
 
-      await plugin["experimental.chat.system.transform"]?.({} as never, output as never)
+      await plugin["experimental.chat.system.transform"]?.({ sessionID: "session-guidance" } as never, output as never)
 
       expect(output.system).toContain("existing guidance")
       expect(output.system.some((line) => line.includes("[Chorus Plugin Active]"))).toBe(true)
@@ -1176,7 +1169,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("hydrates session context without refreshing the lazy bridge on first native agent turn", async () => {
+  it("activates session context and listener on first Chorus tool use", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -1189,21 +1182,18 @@ describe("plugin hooks", () => {
       expect(listToolsCalls).toBe(0)
       expect(toastCalls.some((t) => t.title === "Chorus connected")).toBe(false)
 
-      // First native agent turn via chat.params hydrates context only
-      await plugin["chat.params"]?.(
-        { sessionID: "session-native", agent: "build", model: {} as never, provider: {} as never, message: {} as never },
-        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
-      )
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-native", rootDir))
 
       expect(toolCalls.filter((call) => call.name === "chorus_checkin")).toHaveLength(1)
-      expect(listToolsCalls).toBe(0)
+      expect(listToolsCalls).toBe(1)
       expect(toastCalls.some((t) => t.title === "Chorus connected")).toBe(true)
+      expect(listenerConnectCalls).toBe(1)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
   })
 
-  it("does not repeat session-context hydration on subsequent native turns in the same session", async () => {
+  it("does not repeat activation on subsequent Chorus tool calls in the same session", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 
     try {
@@ -1214,14 +1204,12 @@ describe("plugin hooks", () => {
 
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-dedup" } } } } as never)
 
-      const chatParams = { sessionID: "session-dedup", agent: "build", model: {} as never, provider: {} as never, message: {} as never }
-      const outputParams = { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} }
-      await plugin["chat.params"]?.(chatParams, outputParams)
-      await plugin["chat.params"]?.(chatParams, outputParams)
-      await plugin["chat.params"]?.(chatParams, outputParams)
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-dedup", rootDir))
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-dedup", rootDir))
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-dedup", rootDir))
 
       expect(toolCalls.filter((call) => call.name === "chorus_checkin")).toHaveLength(1)
-      expect(listToolsCalls).toBe(0)
+      expect(listToolsCalls).toBe(1)
       expect(toastCalls.filter((t) => t.title === "Chorus connected")).toHaveLength(1)
     } finally {
       await rm(rootDir, { recursive: true, force: true })
@@ -1237,14 +1225,11 @@ describe("plugin hooks", () => {
         apiKey: "test-key",
       })
 
-      expect(listenerConnectCalls).toBe(1)
+      expect(listenerConnectCalls).toBe(0)
       expect(listenerDisconnectCalls).toBe(0)
 
       await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-old" } } } } as never)
-      await plugin["chat.params"]?.(
-        { sessionID: "session-old", agent: "build", model: {} as never, provider: {} as never, message: {} as never },
-        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
-      )
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-old", rootDir))
 
       expect(listenerConnectCalls).toBe(1)
 
@@ -1259,10 +1244,7 @@ describe("plugin hooks", () => {
       expect(listenerConnectCalls).toBe(1)
       expect(listenerDisconnectCalls).toBe(1)
 
-      await plugin["chat.params"]?.(
-        { sessionID: "session-new", agent: "build", model: {} as never, provider: {} as never, message: {} as never },
-        { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
-      )
+      await plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-new", rootDir))
 
       expect(listenerConnectCalls).toBe(2)
       expect(listenerDisconnectCalls).toBe(1)
@@ -1271,7 +1253,7 @@ describe("plugin hooks", () => {
     }
   })
 
-  it("does not fail a native agent turn when session hydration fails, logs a warning instead", async () => {
+  it("surfaces activation failure from first Chorus tool use", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
     checkinError = new Error("Chorus unavailable")
 
@@ -1286,20 +1268,9 @@ describe("plugin hooks", () => {
         plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-1" } } } } as never),
       ).resolves.toBeUndefined()
 
-      // chat.params for a native agent should also not throw — hydration error is swallowed with a warning
       await expect(
-        plugin["chat.params"]?.(
-          { sessionID: "session-1", agent: "build", model: {} as never, provider: {} as never, message: {} as never },
-          { temperature: 1, topP: 1, topK: 0, maxOutputTokens: undefined, options: {} },
-        ),
-      ).resolves.toBeUndefined()
-
-      expect(logCalls).toContainEqual(
-        expect.objectContaining({
-          level: "warn",
-          message: "Chorus session context hydration failed on chat.params",
-        }),
-      )
+        plugin.tool?.chorus_tools?.execute({}, createToolContext("build", "session-1", rootDir)),
+      ).rejects.toThrow("Chorus unavailable")
     } finally {
       await rm(rootDir, { recursive: true, force: true })
     }
@@ -1433,4 +1404,17 @@ function pluginStatePath(rootDir: string): string {
 
 async function readPluginState(rootDir: string): Promise<Record<string, any>> {
   return JSON.parse(await readFile(pluginStatePath(rootDir), "utf8"))
+}
+
+function createToolContext(agent = "build", sessionID = "session-1", directory = "/tmp/project") {
+  return {
+    sessionID,
+    messageID: "message-1",
+    agent,
+    directory,
+    worktree: directory,
+    abort: new AbortController().signal,
+    metadata: () => {},
+    ask: (() => {}) as never,
+  }
 }

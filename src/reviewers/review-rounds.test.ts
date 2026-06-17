@@ -73,6 +73,7 @@ function createState(reviews: OpenCodeState["reviews"]): OpenCodeState {
     mainSession: { status: "idle" },
     planningScopes: {},
     workers: {},
+    activated: false,
     reviews,
     notificationQueue: [],
     checkpoints: {},

@@ -26,6 +26,18 @@ describe("system transform hook", () => {
     expect(rendered).not.toContain("load the narrowest Chorus skill")
   })
 
+  it("does not inject Chorus content before activation", async () => {
+    const hook = createSystemTransformHook({
+      stateStore: stateStore({ mainSessionId: "session-1", activated: false }),
+      isOpenSpecAvailable: async () => false,
+    })
+    const output = { system: ["existing"] }
+
+    await hook({ sessionID: "session-1" } as never, output as never)
+
+    expect(output.system).toEqual(["existing"])
+  })
+
   it("does not duplicate per-output guidance and injects staging guidance only once", async () => {
     const hook = createSystemTransformHook({
       stagingDir: "/chorus/staging",
@@ -304,6 +316,7 @@ describe("system transform hook", () => {
 type StateStoreInput = {
   mainSessionId?: string
   activeAgent?: string
+  activated?: boolean
   sessionContext?: SessionContextRecord
 }
 
@@ -312,6 +325,7 @@ function stateStore(input: StateStoreInput) {
     readOpenCodeState: async () => ({
       mainSession: { runtimeSessionId: input.mainSessionId },
       activeAgent: input.activeAgent,
+      activated: input.activated ?? true,
       ...(input.sessionContext ? { sessionContext: input.sessionContext } : {}),
     }),
     readSharedState: async () => ({ context: {} }),
