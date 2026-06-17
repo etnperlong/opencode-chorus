@@ -26,7 +26,7 @@ const expectedMetadata: Record<
     role: "task:read",
     keywords: "chorus,ai-dlc,mcp,project,notifications,setup,search,mentions",
     tools: "chorus_checkin,chorus_get_notifications,chorus_search,chorus_search_mentionables",
-    sentinels: ["## Common Tools", "## Skill Routing", "task:read", "### Reports", "chorus-brainstorm"],
+    sentinels: ["## Common Tools", "## Skill Routing", "task:read", "### Reports", "chorus-brainstorm", "chorus_edit_idea", "section: \"basic\""],
   },
   "chorus-brainstorm": {
     workflow: "brainstorm",
@@ -48,8 +48,8 @@ const expectedMetadata: Record<
     role: "idea:write",
     keywords: "idea,elaboration,requirements,questions,owner-confirmation,pm-workflow",
     tools:
-      "chorus_claim_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration",
-    sentinels: ["## Tools", "## Workflow", "idea:write", "question", "### Step 4.5: Brainstorm Mode (Optional Prelude)"],
+      "chorus_claim_idea,chorus_pm_create_idea,chorus_edit_idea,chorus_move_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration",
+    sentinels: ["## Tools", "## Workflow", "idea:write", "question", "### Step 4.5: Brainstorm Mode (Optional Prelude)", "### Idea Lineage", "parentUuid"],
   },
   "chorus-openspec": {
     workflow: "openspec-aware",
@@ -161,7 +161,7 @@ describe("bundled skill metadata", () => {
       expect(frontmatter.compatibility).toBe("opencode")
         expect(metadata).toEqual({
           author: "chorus",
-          version: "0.9.4",
+          version: "0.10.0",
           category: "project-management",
           mcp_server: "lazy-chorus-bridge",
           workflow: expected.workflow,

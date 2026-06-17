@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.4"
+  version: "0.10.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: overview
@@ -41,7 +41,7 @@ creates  analyzes     drafts PRD         codes &      reviews   closes
 
 ### Common Permission Gates
 
-Chorus v0.8 uses a 5x3 permission matrix: 5 resources x 3 actions = 15 possible permissions.
+Chorus uses a 5x3 permission matrix: 5 resources x 3 actions = 15 possible permissions.
 
 | Resource | Meaning |
 |----------|---------|
@@ -58,6 +58,14 @@ Chorus v0.8 uses a 5x3 permission matrix: 5 resources x 3 actions = 15 possible 
 | `admin` | Approve, verify, reopen, close, revoke, or perform governance actions |
 
 Permission strings use `<resource>:<action>`, for example `task:read`, `task:write`, `proposal:write`, or `task:admin`. `chorus_checkin` returns the permissions granted to the current API key; route yourself by the returned permissions rather than by assumptions.
+
+### Permission-Oriented Tool Routing
+
+| Permission | Common tools |
+|------------|--------------|
+| `idea:read` | `chorus_get_ideas`, `chorus_get_idea`, `chorus_get_elaboration` |
+| `idea:write` | `chorus_claim_idea`, `chorus_release_idea`, `chorus_pm_create_idea`, `chorus_edit_idea`, `chorus_pm_start_elaboration`, `chorus_answer_elaboration` |
+| `idea:admin` | `chorus_pm_validate_elaboration`, `chorus_pm_skip_elaboration`, `chorus_move_idea`, `chorus_admin_delete_idea` |
 
 ### Role Presets
 
@@ -180,7 +188,12 @@ A **report** is a short idea-completion summary persisted as a `type="report"` D
 | Tool | Purpose |
 |------|---------|
 | `chorus_get_proposals` | List project Proposals (filterable by status: pending, approved, rejected) |
-| `chorus_get_proposal` | Get a single Proposal's details, including documentDrafts and taskDrafts |
+| `chorus_get_proposal` | Get a single Proposal. Defaults to `section: "basic"`, which returns metadata plus lightweight draft indexes without draft bodies |
+
+Use the `section` parameter when you need more than the default lightweight view:
+- `section: "documents"` returns full document draft bodies
+- `section: "tasks"` returns full task draft descriptions and acceptance criteria
+- `section: "full"` returns both documents and tasks; use this for proposal review snapshots and approval review
 
 ### Tasks
 

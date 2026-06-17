@@ -5,7 +5,7 @@ license: AGPL-3.0
 compatibility: opencode
 metadata:
   author: chorus
-  version: "0.9.4"
+  version: "0.10.0"
   category: project-management
   mcp_server: lazy-chorus-bridge
   workflow: ideation
@@ -13,7 +13,7 @@ metadata:
   audience: opencode-agents
   source: chorus-plugin
   keywords: idea,elaboration,requirements,questions,owner-confirmation,pm-workflow
-  tools: chorus_claim_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration
+  tools: chorus_claim_idea,chorus_pm_create_idea,chorus_edit_idea,chorus_move_idea,chorus_pm_start_elaboration,chorus_answer_elaboration,chorus_pm_validate_elaboration
 ---
 
 
@@ -39,6 +39,17 @@ open --> elaborating --> elaborated
 
 All post-elaboration progress (planning, building, verifying, done) is **derived** from the state of linked Proposals and Tasks. No agent should set Idea status directly beyond elaboration -- all transitions are side-effects of claiming, releasing, or completing elaboration.
 
+### Idea Lineage
+
+Chorus v0.10.0 supports a single-parent, weak Idea lineage through `parentUuid`. Use lineage when a new Idea is derived from an existing Idea but should keep its own proposal, task, and completion lifecycle. Use a Task instead when the work is simply an implementation step inside the current approved scope.
+
+Lineage rules:
+- `chorus_pm_create_idea` accepts `parentUuid` to create a child Idea under an existing Idea in the same project
+- `chorus_edit_idea` can update `parentUuid` to reparent an Idea or set it to `null` to detach it back to top-level
+- Parent and child Ideas must stay in the same project; Chorus rejects cross-project parent links and cycles
+- Weak lineage rolls up context for humans, but child Ideas remain independently elaborated, proposed, implemented, and verified
+- `chorus_move_idea` moves the selected Idea's full lineage subtree, including descendant Ideas and their proposals, documents, tasks, and activities
+
 ---
 
 ## Tools
@@ -47,10 +58,11 @@ All post-elaboration progress (planning, building, verifying, done) is **derived
 
 | Tool | Purpose |
 |------|---------|
-| `chorus_pm_create_idea` | Create a new idea in a project (on behalf of humans) |
+| `chorus_pm_create_idea` | Create a new idea in a project; pass `parentUuid` to derive it from an existing same-project Idea |
+| `chorus_edit_idea` | Edit an Idea's title, description, or `parentUuid`; set `parentUuid: null` to detach to top-level |
 | `chorus_claim_idea` | Claim an open idea (open -> elaborating) |
 | `chorus_release_idea` | Release a claimed idea (elaborating -> open) |
-| `chorus_move_idea` | Move an idea to a different project (also moves linked draft/pending proposals) |
+| `chorus_move_idea` | Move an Idea to a different project, cascading its full lineage subtree and related proposals/documents/tasks/activities |
 
 **Requirements Elaboration:**
 
