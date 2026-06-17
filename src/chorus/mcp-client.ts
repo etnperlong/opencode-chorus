@@ -1,5 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
+import { PACKAGE_VERSION } from "../package-info"
 import { createChorusMcpHeaders, resolveChorusMcpUrl, type ChorusMcpScope } from "./mcp-config"
 import type { ChorusToolTextContent, McpClientStatus } from "./types"
 
@@ -166,7 +167,7 @@ export class ChorusMcpClient {
   }
 
   private createClientAndTransport(scope?: ChorusMcpScope): { client: Client; transport: StreamableHTTPClientTransport } {
-    const client = new Client({ name: "opencode-chorus", version: "0.1.0" })
+    const client = new Client({ name: "opencode-chorus", version: PACKAGE_VERSION })
     const transport = new StreamableHTTPClientTransport(new URL(resolveChorusMcpUrl(this.options.chorusUrl)), {
       requestInit: {
         headers: createChorusMcpHeaders(this.options.apiKey, scope),

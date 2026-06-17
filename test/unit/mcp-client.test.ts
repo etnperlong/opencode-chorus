@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { ChorusMcpClient, isRetryableMcpSessionError, parseToolResult } from "../../src/chorus/mcp-client"
+import { PACKAGE_VERSION } from "../../src/package-info"
 
 describe("parseToolResult", () => {
   it("returns parsed JSON from the first text block", () => {
@@ -35,6 +36,18 @@ describe("isRetryableMcpSessionError", () => {
 })
 
 describe("ChorusMcpClient", () => {
+  it("uses the package version for MCP clientInfo", async () => {
+    const packageJson = await Bun.file(new URL("../../package.json", import.meta.url)).json() as { version: string }
+    const client = new ChorusMcpClient({ chorusUrl: "https://chorus.example", apiKey: "test" })
+    const { client: mcpClient, transport } = client["createClientAndTransport"]()
+
+    expect(PACKAGE_VERSION).toBe(packageJson.version)
+    expect(PACKAGE_VERSION).not.toBe("0.1.0")
+    expect((mcpClient as unknown as { _clientInfo: { version: string } })._clientInfo.version).toBe(packageJson.version)
+
+    await transport.close().catch(() => {})
+  })
+
   it("lists tools across paginated MCP responses", async () => {
     const client = new ChorusMcpClient({ chorusUrl: "https://chorus.example", apiKey: "test" })
     client["statusValue"] = "connected"
