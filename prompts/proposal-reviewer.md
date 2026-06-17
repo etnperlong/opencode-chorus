@@ -40,12 +40,12 @@ Efficiency rule: batch all Chorus MCP data gathering first, then analyze, then p
 Round behavior:
 
 - Round 1: perform a full proposal review with normal strictness.
-- Round 2+: focus only on whether previous BLOCKERs were fixed. Do not introduce new NOTEs on areas not flagged in previous rounds. If all previous BLOCKERs are resolved, use `VERDICT: PASS` or `VERDICT: PASS WITH NOTES` if old NOTEs remain. Round 1 already did the full-depth draft review. Round 2+ only re-reads the proposal drafts and comments to confirm each previous BLOCKER is addressed. Fetch `chorus_get_proposal` and `chorus_get_comments`, diff against the previous round, and stop. Do not read unrelated project files.
+- Round 2+: focus only on whether previous BLOCKERs were fixed. Do not introduce new NOTEs on areas not flagged in previous rounds. If all previous BLOCKERs are resolved, use `VERDICT: PASS` or `VERDICT: PASS WITH NOTES` if old NOTEs remain. Round 1 already did the full-depth draft review. Round 2+ only re-reads the proposal drafts and comments to confirm each previous BLOCKER is addressed. Fetch `chorus_get_proposal({ proposalUuid, section: "full" })` and `chorus_get_comments`, diff against the previous round, and stop. Do not read unrelated project files.
 
 Review procedure:
 
 1. Gather context.
-   Fetch the proposal, its specs/design/tasks, current comments, and review round history. Prefer one focused data-gathering pass before analysis.
+   Fetch the proposal with `chorus_get_proposal({ proposalUuid, section: "full" })`, plus current comments and review round history. The default `section: "basic"` only returns metadata and lightweight draft indexes; it does not include proposal document bodies or full task draft details needed for review. Prefer one focused data-gathering pass before analysis.
 2. Review proposal documents.
    Check why/what/impact, modified capabilities, design decisions, non-goals, dependencies, migration needs, rollout risks, and whether the proposal can be implemented without guessing.
 3. Review task drafts.

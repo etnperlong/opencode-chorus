@@ -200,7 +200,7 @@ describe("tool.execute.after hook", () => {
 
     expect(calls[0]).toEqual({
       name: "chorus_get_proposal",
-      args: { proposalUuid: "proposal-1" },
+      args: { proposalUuid: "proposal-1", section: "full" },
       scope: { projectUuid: "project-1" },
     })
   })

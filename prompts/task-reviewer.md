@@ -51,7 +51,7 @@ Round behavior:
 Review procedure:
 
 1. Gather context.
-   Fetch the task, acceptance criteria, related proposal/spec/design artifacts, current comments, previous reviewer comments, and the review round.
+   Fetch the task, acceptance criteria, current comments, previous reviewer comments, and the review round. If the task includes a `proposalUuid`, fetch proposal document context with `chorus_get_proposal({ proposalUuid: "<from-task>", section: "documents" })` before cross-checking implementation against proposal docs. The default proposal section is lightweight and does not include document bodies.
 2. Read code.
    Inspect the exact files changed for this task plus the surrounding call sites needed to understand behavior. Do not rely on file names alone.
 3. Verify acceptance criteria.

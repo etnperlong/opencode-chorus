@@ -399,7 +399,7 @@ async function readTargetSnapshot(
 ): Promise<{ signature: string; displayName: string } | undefined> {
   try {
     if (targetType === "proposal") {
-      const proposal = await client.callTool("chorus_get_proposal", { proposalUuid: targetUuid }, scope)
+      const proposal = await client.callTool("chorus_get_proposal", { proposalUuid: targetUuid, section: "full" }, scope)
       return {
         signature: buildReviewTargetSignature(targetType, proposal),
         displayName: extractReviewTargetDisplayName(targetType, proposal),
