@@ -77,13 +77,15 @@ export class ChorusReadiness {
     const state = await this.options.stateStore.readOpenCodeState()
     const context = state.sessionContext
 
-    const [projectGroupName, openSpecAvailable] = await Promise.all([
+    const [projectGroupName, boundProjectUuid, openSpecAvailable] = await Promise.all([
       this.resolveProjectGroupName(context),
+      this.resolveBoundProjectUuid(),
       this.detectOpenSpec(),
     ])
 
     const agentName = context?.agent?.name ?? "Chorus"
-    const scopeStr = buildProjectScopeStr(context?.projects ?? [], projectGroupName)
+    const projects = filterProjectsByBinding(context?.projects ?? [], boundProjectUuid)
+    const scopeStr = buildProjectScopeStr(projects, projectGroupName)
     const lines: string[] = [`▣ Agent: ${agentName}`]
     if (scopeStr) lines.push(`▣ Project: ${scopeStr}`)
     if (openSpecAvailable) lines.push("", "(+ OpenSpec)")
@@ -109,14 +111,16 @@ export class ChorusReadiness {
         const context = state.sessionContext
 
         // 4. Scope enrichment and OpenSpec detection in parallel (best-effort)
-        const [projectGroupName, openSpecAvailable] = await Promise.all([
+        const [projectGroupName, boundProjectUuid, openSpecAvailable] = await Promise.all([
           this.resolveProjectGroupName(context),
+          this.resolveBoundProjectUuid(),
           this.detectOpenSpec(),
         ])
 
         // 5. Emit a single combined success toast
         const agentName = context?.agent?.name ?? "Chorus"
-        const scopeStr = buildProjectScopeStr(context?.projects ?? [], projectGroupName)
+        const projects = filterProjectsByBinding(context?.projects ?? [], boundProjectUuid)
+        const scopeStr = buildProjectScopeStr(projects, projectGroupName)
         const lines: string[] = [`▣ Agent: ${agentName}`]
         if (scopeStr) lines.push(`▣ Project: ${scopeStr}`)
         if (openSpecAvailable) lines.push("", "(+ OpenSpec)")
@@ -183,6 +187,15 @@ export class ChorusReadiness {
     return undefined
   }
 
+  private async resolveBoundProjectUuid(): Promise<string | undefined> {
+    try {
+      const sharedState = await this.options.stateStore.readSharedState?.()
+      return sharedState?.context?.projectUuid
+    } catch {
+      return undefined
+    }
+  }
+
   private async detectOpenSpec(): Promise<boolean> {
     try {
       const availability = await detectOpenSpecAvailability(this.options.directory, () => isOpenSpecCliAvailable())
@@ -227,17 +240,22 @@ export function formatPermissions(permissions: SessionContextRecord["agent"] ext
   return ""
 }
 
+export function filterProjectsByBinding(
+  projects: SessionContextRecord["projects"],
+  boundProjectUuid: string | undefined,
+): SessionContextRecord["projects"] {
+  if (!boundProjectUuid) return projects
+  return projects.filter((project) => project.uuid === boundProjectUuid)
+}
+
 export function buildProjectScopeStr(
   projects: SessionContextRecord["projects"],
   projectGroupName?: string,
 ): string {
-  if (projects.length === 0) return ""
-  if (projects.length === 1) {
-    const name = projects[0]!.name
-    if (projectGroupName) return `${name} (${projectGroupName})`
-    return name
-  }
-  return "multiple projects"
+  if (projects.length !== 1) return ""
+  const name = projects[0]!.name
+  if (projectGroupName) return `${name} (${projectGroupName})`
+  return name
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

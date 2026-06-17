@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- Fixed connection toast showing "multiple projects" when no workspace project is bound; toast now only displays a project name when exactly one project is available or bound.
+
 ### Changed
 
 - Updated bundled Chorus skills to upstream skill metadata version `0.10.0`, including Idea lineage guidance for `parentUuid`, `chorus_edit_idea`, and full-subtree `chorus_move_idea` behavior.
