@@ -18,13 +18,13 @@
 
 [**Chorus**](https://github.com/Chorus-AIDLC/Chorus) is an agent harness for AI-Human collaboration, inspired by the [AI-Driven Development Lifecycle (AI-DLC)](https://aws.amazon.com/blogs/devops/ai-driven-development-life-cycle/) methodology. It manages session lifecycle, task state, sub-agent orchestration, observability, and failure recovery — letting multiple AI agents and humans collaborate through the full workflow from requirements to delivery.
 
-**opencode-chorus** is the community-maintained plugin that connects [OpenCode](https://opencode.ai) to your Chorus instance. It loads Chorus workflow skills, exposes a lazy MCP tool bridge, and provides lifecycle hooks and reviewer automation — all without manual tool or skill configuration.
+**opencode-chorus** is the community-maintained plugin that connects [OpenCode](https://opencode.ai) to your Chorus instance. It loads Chorus workflow skills, exposes an on-demand MCP tool bridge, and provides lifecycle hooks and reviewer automation — all without manual tool or skill configuration.
 
 ## Features
 
 | Category | Components | Description |
 |---|---|---|
-| **Lifecycle Hooks** | State Management, Lazy MCP Bridge, Context Injection, Notification Coordination | Manages state, discovers Chorus tools on demand, injects project context, and routes notifications. |
+| **Lifecycle Hooks** | State Management, Lazy MCP Bridge, Context Injection, Notification Coordination | Manages state, activates Chorus on first tool use, injects project context after activation, and routes notifications. |
 | **Review Agents** | Proposal Reviewer, Task Reviewer | Automated reviewers that evaluate proposals and verify completed tasks with structured verdicts. |
 | **Workflow Skills** | 8 bundled skills covering the full AI-DLC pipeline | `chorus`, `chorus-idea`, `chorus-proposal`, `chorus-develop`, `chorus-quick-dev`, `chorus-review`, `chorus-yolo`, `chorus-openspec` |
 
@@ -70,6 +70,8 @@ export CHORUS_API_KEY="your-chorus-api-key"
 ### 3. Restart OpenCode
 
 After installing and configuring, restart OpenCode. You will see the bundled Chorus skills in your workspace. Load the `chorus` skill to get started.
+
+The plugin does not connect to Chorus during OpenCode startup. It registers the lazy bridge tools immediately, then creates the Chorus session, starts notification listening, and enables system prompt context injection when you first call a Chorus bridge tool such as `chorus_tools` or `chorus_workspace_context`.
 
 For all configuration options (environment variables, `chorus.json` fields, state storage, observability settings), see [docs/CONFIGURATION.md](./docs/CONFIGURATION.md).
 

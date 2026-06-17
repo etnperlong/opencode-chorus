@@ -89,6 +89,9 @@ export CHORUS_STATE_MODE="global"  # global or project
 export CHORUS_GLOBAL_STATE_ROOT="/custom/opencode/chorus/state"
 ```
 
+> [!NOTE]
+> `autoStart` and `CHORUS_AUTO_START` are no longer supported. A legacy `autoStart` field in `chorus.json` is ignored without error; Chorus activation is always on demand.
+
 ## Configuration Options
 
 ### `projectUuids`
@@ -101,7 +104,7 @@ Defines the explicit Chorus project allowlist for automatic notification deliver
 
 ### `enableSessionContextSummary`
 
-Controls one concise startup/resume Chorus context summary. When disabled, context remains runtime-only and no proactive summary is shown.
+Controls one concise Chorus context summary after on-demand activation. When disabled, context remains runtime-only and no proactive summary is shown.
 
 ### `enableNotificationHints`
 
@@ -146,19 +149,22 @@ To temporarily roll back to project-local storage, set `CHORUS_STATE_MODE=projec
 
 ## Lazy Chorus Tools
 
-The plugin exposes three native bridge tools:
+The plugin registers the lazy bridge tools during startup but does not connect to Chorus until one of them is used. First use triggers readiness: the Chorus session is hydrated, the remote tool list is refreshed, the notification listener starts, and system prompt context injection becomes active.
+
+The plugin exposes these native bridge tools:
 
 | Tool | Description |
 |---|---|
 | `chorus_tools` | Lists all Chorus tool names exposed by the remote Chorus MCP server |
 | `chorus_tool_get` | Returns the description for one Chorus tool |
 | `chorus_tool_execute` | Executes a real Chorus tool by name after applying the plugin's argument-safety policy |
+| `chorus_workspace_context` | Local-only workspace binding tool; also triggers on-demand Chorus activation before execution |
 
-Usage flow: call `chorus_tools` → inspect a tool with `chorus_tool_get` → execute via `chorus_tool_execute`. The bridge keeps the real Chorus tool list in session memory and refreshes it when sessions start or resume.
+Usage flow: call `chorus_tools` → inspect a tool with `chorus_tool_get` → execute via `chorus_tool_execute`. The bridge keeps the real Chorus tool list in session memory after activation.
 
 ## Managed Project Context
 
-On each system transform, the plugin injects a bounded `Chorus Context` summary into the native agent's system prompt using cached runtime state.
+After Chorus activation, each system transform injects a bounded `Chorus Context` summary into the native agent's system prompt using cached runtime state. Before activation, the transform hook leaves the system prompt unchanged.
 
 | Scope | Behavior |
 |---|---|

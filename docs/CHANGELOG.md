@@ -4,12 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Added runtime-only Chorus activation state so plugin startup registers tools without creating a Chorus session, opening SSE, or injecting Chorus system prompt content.
+- Added on-demand activation from all bridge entry points, including `chorus_tools`, `chorus_tool_get`, `chorus_tool_execute`, and `chorus_workspace_context`.
+
 ### Fixed
 
 - Fixed connection toast showing "multiple projects" when no workspace project is bound; toast now only displays a project name when exactly one project is available or bound.
+- Fixed unused Chorus sessions, SSE connections, Toasts, and prompt injection appearing before the user explicitly uses a Chorus bridge tool.
 
 ### Changed
 
+- Removed the `autoStart` configuration field and `CHORUS_AUTO_START` environment variable. Legacy `chorus.json` files containing `autoStart` are parsed successfully and the field is ignored.
+- Changed notification routing so `task_assigned` notifications always use the assistant-turn queue after activation instead of falling back to context-only delivery.
+- Changed system prompt injection to skip all Chorus content until runtime activation, then restore the existing `Chorus Context`, per-turn reminder, sub-session guidance, and Plan agent guidance.
 - Updated bundled Chorus skills to upstream skill metadata version `0.10.0`, including Idea lineage guidance for `parentUuid`, `chorus_edit_idea`, and full-subtree `chorus_move_idea` behavior.
 - Updated reviewer prompts and proposal review snapshots to request explicit `chorus_get_proposal` sections when full draft bodies or proposal documents are required.
 - Updated MCP clientInfo version reporting to use the package version instead of the stale hard-coded `0.1.0` value.

@@ -12,10 +12,10 @@
 ## Architecture
 
 - `src/index.ts` is the plugin entrypoint and exports `createPlugin`, `ChorusPlugin`, and the default plugin.
-- Startup wiring in `src/index.ts` loads config, initializes `StateStore`, creates `ChorusMcpClient`, registers bundled skills/reviewer agents, hooks OpenCode events, hooks tool execution, and exposes the lazy bridge tools.
+- Startup wiring in `src/index.ts` loads config, initializes `StateStore`, creates `ChorusMcpClient`, registers bundled skills/reviewer agents, hooks OpenCode events, hooks tool execution, and exposes the lazy bridge tools without connecting to Chorus until first bridge use.
 - Bundled runtime assets are part of the npm contract: `skills/`, `prompts/`, `README.md`, `LICENSE`, and built `dist/` are listed in `package.json` `files` and asserted by tests.
 - Reviewer agent definitions live in `src/reviewers/reviewer-agents.ts`; their prompts are loaded from `prompts/proposal-reviewer.md` and `prompts/task-reviewer.md`.
-- The lazy Chorus bridge exposes only `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`; bridge execution requires raw Chorus MCP tool names like `chorus_get_task`.
+- The lazy Chorus bridge exposes `chorus_tools`, `chorus_tool_get`, `chorus_tool_execute`, and the local-only `chorus_workspace_context`; first bridge use triggers visible readiness for native agents and silent readiness for reviewer agents.
 
 ## Configuration And State
 
@@ -24,7 +24,7 @@
 - Required runtime config is `chorusUrl` plus `apiKey`; env supports `CHORUS_BASE_URL` or `CHORUS_URL`, and `CHORUS_API_KEY` is preferred over storing secrets in `chorus.json`.
 - Chorus prompt injection toggles default to enabled: `enableSubsessionInjection`, `enablePlanAgentGuidance`, and `enablePerTurnReminder`.
 - Default state mode is global. In global mode, `stateDir` is ignored except for legacy `.chorus` migration; set `stateMode: "project"` to force project-local state.
-- Persisted state intentionally keeps only reviews, notification queue, and project metadata. Session context, lazy bridge status, notification runtime, workers, and checkpoints are runtime-only.
+- Persisted state intentionally keeps only reviews, notification queue, and project metadata. Session context, activation status, lazy bridge status, notification runtime, workers, and checkpoints are runtime-only.
 
 ## Chorus Workflow
 

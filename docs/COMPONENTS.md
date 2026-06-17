@@ -6,19 +6,19 @@ This document describes all components provided by `opencode-chorus`.
 
 ### State Management
 
-Keeps reviewer state and notification delivery data in OpenCode's per-user state directory. Supports global (platform-specific) and project-local storage modes. Handles legacy `.chorus/` migration on first startup.
+Keeps reviewer state and notification delivery data in OpenCode's per-user state directory. Supports global (platform-specific) and project-local storage modes. Handles legacy `.chorus/` migration on first startup. Chorus activation state is runtime-only and is not persisted.
 
 ### Lazy MCP Bridge
 
-Exposes `chorus_tools`, `chorus_tool_get`, and `chorus_tool_execute`, then discovers real Chorus tools from the Chorus MCP server on demand. The bridge keeps tool definitions in session memory and refreshes on session start or resume.
+Exposes `chorus_tools`, `chorus_tool_get`, `chorus_tool_execute`, and `chorus_workspace_context` without connecting to Chorus at plugin load time. The first bridge call runs readiness, refreshes real Chorus tools from the Chorus MCP server, starts notification listening, and marks the runtime as activated.
 
 ### Managed Context Injection
 
-Injects a bounded `Chorus Context` summary into the native agent's system prompt. Includes project scope (managed / unmanaged / ambiguous), owner metadata, permission scope, and OpenSpec availability. Adds a concise per-turn reminder for main sessions, task workflow guidance for detected sub-sessions, AI-DLC guidance for the `plan` agent, and staging directory guidance only once per hook lifecycle.
+Injects a bounded `Chorus Context` summary into the native agent's system prompt only after Chorus activation. Includes project scope (managed / unmanaged / ambiguous), owner metadata, permission scope, and OpenSpec availability. Adds a concise per-turn reminder for main sessions, task workflow guidance for detected sub-sessions, AI-DLC guidance for the `plan` agent, and staging directory guidance only once per hook lifecycle.
 
 ### Notification Coordination
 
-Listens for Chorus SSE notifications and routes them into OpenCode's assistant turn queue. Supports project-scoped delivery via `projectUuids`, backfill catch-up from checkpoints, and main-session handoff ownership.
+Starts listening for Chorus SSE notifications only after on-demand readiness succeeds. Routes supported notifications into OpenCode's assistant turn queue, supports project-scoped delivery via `projectUuids`, runs backfill catch-up from checkpoints on connect/reconnect, and preserves main-session handoff ownership.
 
 ### Permission Auto-Allow
 
