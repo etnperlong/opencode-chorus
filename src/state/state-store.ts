@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, rm, rmdir, writeFile } from "node:fs/promises"
+import { mkdir, readFile, rename, rm, rmdir, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import {
   createDefaultRuntimeState,
@@ -13,6 +13,9 @@ import {
 } from "./migrations"
 import { resolveChorusPaths, resolveStatePaths, type ChorusPaths, type StateMode } from "./paths"
 import type { OpenCodeState, SharedState } from "./state-types"
+
+const LOCK_STALE_AFTER_MS = 30_000
+const LOCK_ACQUIRE_TIMEOUT_MS = 60_000
 
 export type StateStoreOptions = {
   projectRoot: string
@@ -247,15 +250,32 @@ export class StateStore {
 
   private async acquireLock(lockPath: string): Promise<void> {
     await mkdir(this.paths.locksDir, { recursive: true })
+    const startedAt = Date.now()
     while (true) {
       try {
         await mkdir(lockPath)
         return
       } catch (error) {
         if (!isFileExistsError(error)) throw error
+        if (await removeStaleLock(lockPath)) continue
+        if (Date.now() - startedAt > LOCK_ACQUIRE_TIMEOUT_MS) {
+          throw new Error(`Timed out waiting for Chorus state lock: ${lockPath}`)
+        }
         await sleep(5)
       }
     }
+  }
+}
+
+async function removeStaleLock(lockPath: string): Promise<boolean> {
+  try {
+    const info = await stat(lockPath)
+    if (Date.now() - info.mtimeMs <= LOCK_STALE_AFTER_MS) return false
+    await rm(lockPath, { recursive: true, force: true })
+    return true
+  } catch (error) {
+    if (isMissingFileError(error)) return true
+    throw error
   }
 }
 

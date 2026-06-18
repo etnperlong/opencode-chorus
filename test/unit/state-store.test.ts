@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { access, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises"
+import { access, mkdtemp, mkdir, readFile, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { migrateOpenCodeState, migrateSharedState } from "../../src/state/migrations"
@@ -126,6 +126,26 @@ describe("StateStore", () => {
     const result = await store.readOpenCodeState()
 
     expect(result.mainSession.status).toBe("active")
+  })
+
+  it("removes stale state locks instead of waiting forever", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "chorus-state-"))
+    const store = new StateStore(projectRoot, ".chorus")
+    const lockPath = join(projectRoot, ".chorus", "locks", "opencode-state.lock")
+    await mkdir(lockPath, { recursive: true })
+    const staleDate = new Date(Date.now() - 60_000)
+    await utimes(lockPath, staleDate, staleDate)
+
+    await store.updateOpenCodeState((state) => ({
+      ...state,
+      mainSession: {
+        ...state.mainSession,
+        status: "active",
+      },
+    }))
+
+    expect((await store.readOpenCodeState()).mainSession.status).toBe("active")
+    expect(await exists(lockPath)).toBe(false)
   })
 
   it("tracks the active agent in runtime state only", async () => {
