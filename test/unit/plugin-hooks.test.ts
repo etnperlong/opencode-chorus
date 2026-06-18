@@ -136,6 +136,38 @@ describe("plugin hooks", () => {
     }
   })
 
+  it("auto-activates Chorus on session startup when workspace context is already bound", async () => {
+    const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
+
+    try {
+      const stateStore = new StateStore({ projectRoot: rootDir, worktree: rootDir })
+      await stateStore.init()
+      await stateStore.updateSharedState((state) => ({
+        ...state,
+        context: { projectUuid: "project-1", projectName: "OpenCode-Chorus" },
+      }))
+
+      const plugin = await createPlugin(createContext(rootDir), {
+        chorusUrl: "http://localhost:8637",
+        apiKey: "test-key",
+      })
+
+      await plugin.event?.({ event: { type: "session.created", properties: { info: { id: "session-bound" } } } } as never)
+
+      expect(toolCalls.map((call) => call.name)).toContain("chorus_checkin")
+      expect(listToolsCalls).toBe(1)
+      expect(listenerConnectCalls).toBe(1)
+      expect(toastCalls).toContainEqual(
+        expect.objectContaining({
+          title: "Chorus connected",
+          variant: "success",
+        }),
+      )
+    } finally {
+      await rm(rootDir, { recursive: true, force: true })
+    }
+  })
+
   it("does not create .chorus state on plugin creation alone", async () => {
     const rootDir = await mkdtemp(join(tmpdir(), "opencode-chorus-plugin-"))
 

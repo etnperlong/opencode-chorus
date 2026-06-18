@@ -101,6 +101,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     sessionLifecycle,
     logger,
     onSessionReady: async (sessionId) => {
+      await autoActivateBoundWorkspace(sessionId)
       await notificationCoordinator.handleSessionReady(sessionId)
     },
     onSessionIdle: async (sessionId) => {
@@ -159,6 +160,19 @@ export const createPlugin: Plugin = async (ctx, options) => {
     }
   }
 
+  const autoActivateBoundWorkspace = async (sessionID: string, mode: "visible" | "silent" = "visible") => {
+    const sharedState = await stateStore.readSharedState().catch(() => undefined)
+    if (!sharedState?.context.projectUuid) return
+
+    try {
+      await readiness.ensureReady(sessionID, mode)
+    } catch (error) {
+      await logger.warn("Chorus auto-activation from workspace context failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   return {
     config: applyPluginConfig,
     event: eventHook,
@@ -170,6 +184,7 @@ export const createPlugin: Plugin = async (ctx, options) => {
     },
     "chat.params": async ({ sessionID, agent }) => {
       stateStore.setActiveAgent(agent)
+      await autoActivateBoundWorkspace(sessionID, REVIEWER_AGENTS.has(agent) ? "silent" : "visible")
       await hydrateSessionContext(sessionID, agent).catch(async (error) => {
         await logger.warn("Chorus session context hydration failed on chat.params", {
           error: error instanceof Error ? error.message : String(error),
